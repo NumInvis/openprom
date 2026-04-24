@@ -18,7 +18,9 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
+import json as json_module
 
 from porm.core.dual_api_scorer import DualAPITechniqueScorer, DualAPIScore
 from porm.engines.meter import MeterMatcher
@@ -60,6 +62,14 @@ class CoupletRequest(BaseModel):
     upper: str = Field(..., description="上联", min_length=1, max_length=100)
     lower: str = Field(..., description="下联", min_length=1, max_length=100)
     enable_cache: bool = Field(default=True, description="是否启用缓存")
+    stream: bool = Field(default=False, description="是否启用流式输出")
+
+
+class StreamEvent(BaseModel):
+    """流式事件"""
+    event: str
+    data: dict
+    timestamp: float
 
 
 class CoupletResponse(BaseModel):
@@ -188,11 +198,40 @@ async def health_check():
     )
 
 
-@app.post("/api/v1/couplet/analyze", response_model=CoupletResponse)
+async def _generate_stream(upper: str, lower: str, start_time: float):
+    """生成流式响应"""
+    try:
+        yield f"data: {json_module.dumps({'event': 'start', 'timestamp': time.time()})}\n\n"
+        
+        yield f"data: {json_module.dumps({'event': 'formal_check', 'data': {'status': 'checking', 'message': '形式检测中...'}, 'timestamp': time.time()})}\n\n"
+        
+        scorer = _get_scorer()
+        result = scorer.analyze(upper, lower)
+        
+        processing_time = time.time() - start_time
+        
+        yield f"data: {json_module.dumps({'event': 'formal_check', 'data': {'status': 'complete', 'formal_score': result.formal_score, 'pingze_score': result.pingze_score, 'warnings': result.warnings}, 'timestamp': time.time()})}\n\n"
+        
+        yield f"data: {json_module.dumps({'event': 'technique_analysis', 'data': {'status': 'complete', 'technique_score': result.technique_score, 'qwen_similarity': result.qwen_cosine_similarity}, 'timestamp': time.time()})}\n\n"
+        
+        yield f"data: {json_module.dumps({'event': 'artistic_analysis', 'data': {'status': 'complete', 'artistic_score': result.artistic_score, 'impression_score': result.impression_score}, 'timestamp': time.time()})}\n\n"
+        
+        final_result = _score_to_response(result, processing_time)
+        yield f"data: {json_module.dumps({'event': 'complete', 'data': jsonable_encoder(final_result), 'timestamp': time.time()})}\n\n"
+        
+        yield f"data: {json_module.dumps({'event': 'end', 'timestamp': time.time()})}\n\n"
+        
+    except Exception as e:
+        logger.error(f"流式评分失败：{e}", exc_info=True)
+        yield f"data: {json_module.dumps({'event': 'error', 'error': str(e), 'timestamp': time.time()})}\n\n"
+
+
+@app.post("/api/v1/couplet/analyze")
 async def analyze_couplet(request: CoupletRequest):
     """分析对联并评分
     
     这是核心 API 端点，提供完整的对联评分功能。
+    支持流式输出 (SSE)。
     """
     start_time = time.time()
     
@@ -208,6 +247,17 @@ async def analyze_couplet(request: CoupletRequest):
             raise HTTPException(
                 status_code=400,
                 detail=f"上下联字数不等：上联{len(request.upper)}字，下联{len(request.lower)}字"
+            )
+        
+        if request.stream:
+            return StreamingResponse(
+                _generate_stream(request.upper, request.lower, start_time),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no"
+                }
             )
         
         scorer = _get_scorer()
