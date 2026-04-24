@@ -17,10 +17,12 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 import json as json_module
+import os
 
 from porm.core.dual_api_scorer import DualAPITechniqueScorer, DualAPIScore
 from porm.engines.meter import MeterEngine, MeterMatch
@@ -143,6 +145,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 挂载静态文件目录
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+
 
 def _get_scorer() -> DualAPITechniqueScorer:
     """获取评分器实例"""
@@ -176,9 +183,12 @@ def _score_to_response(
     )
 
 
-@app.get("/", response_model=dict)
+@app.get("/", response_class=FileResponse)
 async def root():
-    """API 根路径"""
+    """返回前端首页"""
+    index_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "index.html")
+    if os.path.exists(index_path):
+        return index_path
     return {
         "name": "PORM API",
         "version": "4.1.0",

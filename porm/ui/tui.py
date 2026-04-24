@@ -1,4 +1,6 @@
-"""PORM 终端交互界面 (Terminal User Interface)
+"""PORM 终端交互界面 (已弃用)
+
+⚠️ 警告：TUI 模式已弃用，请使用 Web 界面访问 http://localhost:8000
 
 采用素雅高级的设计风格，提供沉浸式的对联评分体验。
 使用 Rich 库实现精美的文本渲染和交互效果。
@@ -9,9 +11,17 @@ from dataclasses import dataclass
 from enum import Enum, auto
 import sys
 import os
+import warnings
 
 from porm.utils.config import load_config as _load_config
 from porm.core.analyzer_interface import AnalysisResult as CoreAnalysisResult
+
+warnings.warn(
+    "TUI 模式已弃用，请使用 Web 界面：http://localhost:8000\n"
+    "运行 python -m porm.api 启动 Web 服务",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 def load_config() -> dict:

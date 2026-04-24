@@ -1,15 +1,25 @@
-"""PORM 命令行入口
+"""PORM 命令行入口 (已弃用)
+
+⚠️ 警告：CLI 模式已弃用，请使用 Web 界面访问 http://localhost:8000
 
 提供对联评分、诗律检测、词牌检测等功能。
 """
 
 import argparse
 import os
+import warnings
 from typing import List, Optional
 
 from porm.core.analyzer import analyze as analyze_couplet
 from porm.engines.meter import match_shi, match_ci, find_best_shi, find_best_ci
 from porm.utils.config import load_config as _load_config
+
+warnings.warn(
+    "CLI 模式已弃用，请使用 Web 界面：http://localhost:8000\n"
+    "运行 python -m porm.api 启动 Web 服务",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 def load_config() -> dict:

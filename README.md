@@ -48,28 +48,39 @@ cp .env.example .env
 ### 3. 启动服务
 
 ```bash
-# 方式 1: REST API 服务
+# 方式 1: Web 界面 + API 服务 (推荐)
 python -m porm.api
 
 # 方式 2: Docker Compose (推荐)
 docker-compose up -d
-
-# 方式 3: TUI 界面
-python -m porm.ui.tui
-
-# 方式 4: 命令行
-python -m porm.main couplet "春风化雨" "秋月寒霜"
 ```
 
-### 4. 访问 API 文档
+### 4. 访问 Web 界面
 
-打开浏览器：http://localhost:8000/docs
+打开浏览器访问：
+
+- **Web 界面**: http://localhost:8000
+- **API 文档**: http://localhost:8000/docs
+
+### ⚠️ 弃用通知
+
+CLI 和 TUI 模式已弃用，请迁移到 Web 界面使用。
 
 ---
 
 ## 使用方式
 
-### REST API
+### 🌐 Web 界面
+
+启动服务后，打开浏览器访问 **http://localhost:8000**
+
+Web 界面提供:
+- ✨ 现代化的视觉设计
+- 📊 直观的分数展示
+- 💬 详细的评鉴分析
+- 📤 一键分享结果
+
+### 🔌 REST API
 
 #### 对联评分（标准模式）
 
@@ -102,7 +113,7 @@ from porm import CoupletAnalyzer
 
 analyzer = CoupletAnalyzer(
     api_key="your-api-key",
-    base_url="https://api.example.com/v1",
+    base_url="http://localhost:8000",
     model="Qwen3.5-9B-Instruct"
 )
 
@@ -113,27 +124,11 @@ print(f"等级：{result.grade}")
 print(f"评语：{result.comments}")
 ```
 
-### 命令行
+### ⚠️ 已弃用
 
-```bash
-# 对联评分
-python -m porm.main couplet "春风化雨" "秋月寒霜"
-
-# 诗律检测
-python -m porm.main shi "床前明月光"
-
-# 词牌检测
-python -m porm.main ci "明月几时有"
-
-# 列出可用模式
-python -m porm.main list
-```
-
-### TUI 界面
-
-```bash
-python -m porm.ui.tui
-```
+以下交互方式已弃用，请迁移到 Web 界面:
+- ❌ CLI 命令行
+- ❌ TUI 终端界面
 
 ---
 

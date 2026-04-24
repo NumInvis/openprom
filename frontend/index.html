@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PORM - 对联评鉴系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">🎋</span>
+          <h1 class="logo-title">PORM</h1>
+        </div>
+        <p class="tagline">对联自动评鉴系统</p>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="input-section">
+        <div class="input-container">
+          <div class="input-group">
+            <label for="upper" class="input-label">
+              <span class="label-icon">上</span>
+              <span class="label-text">上联</span>
+            </label>
+            <textarea 
+              id="upper" 
+              class="input-field" 
+              placeholder="请输入上联..."
+              rows="2"
+            ></textarea>
+          </div>
+
+          <div class="input-group">
+            <label for="lower" class="input-label">
+              <span class="label-icon">下</span>
+              <span class="label-text">下联</span>
+            </label>
+            <textarea 
+              id="lower" 
+              class="input-field" 
+              placeholder="请输入下联..."
+              rows="2"
+            ></textarea>
+          </div>
+
+          <button id="analyzeBtn" class="analyze-button">
+            <span class="button-text">开始评鉴</span>
+            <span class="button-icon">→</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="loadingSection" class="loading-section hidden">
+        <div class="loading-container">
+          <div class="loading-spinner"></div>
+          <p class="loading-text">正在评鉴中...</p>
+          <div class="loading-steps">
+            <div class="loading-step" data-step="formal">
+              <span class="step-icon">📐</span>
+              <span class="step-text">形式检测</span>
+            </div>
+            <div class="loading-step" data-step="technique">
+              <span class="step-icon">✍️</span>
+              <span class="step-text">技法分析</span>
+            </div>
+            <div class="loading-step" data-step="artistic">
+              <span class="step-icon">🎨</span>
+              <span class="step-text">艺术评鉴</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="resultSection" class="result-section hidden">
+        <div class="result-header">
+          <div class="score-circle">
+            <svg class="score-svg" viewBox="0 0 120 120">
+              <circle class="score-bg" cx="60" cy="60" r="54"/>
+              <circle class="score-progress" cx="60" cy="60" r="54"/>
+            </svg>
+            <div class="score-content">
+              <span class="score-value" id="totalScore">0</span>
+              <span class="score-label">总分</span>
+            </div>
+          </div>
+          <div class="grade-badge" id="gradeBadge">待评鉴</div>
+        </div>
+
+        <div class="couplet-display">
+          <div class="couplet-line upper">
+            <span class="couplet-label">上联</span>
+            <span class="couplet-text" id="resultUpper"></span>
+          </div>
+          <div class="couplet-line lower">
+            <span class="couplet-label">下联</span>
+            <span class="couplet-text" id="resultLower"></span>
+          </div>
+        </div>
+
+        <div class="scores-grid">
+          <div class="score-card">
+            <div class="score-card-header">
+              <span class="score-card-icon">📐</span>
+              <span class="score-card-title">形式合规</span>
+              <span class="score-card-weight">30%</span>
+            </div>
+            <div class="score-card-body">
+              <div class="score-bar">
+                <div class="score-bar-fill" id="formalBar"></div>
+              </div>
+              <span class="score-card-value" id="formalScore">0</span>
+            </div>
+            <div class="score-card-detail">
+              <span class="detail-label">平仄:</span>
+              <span class="detail-value" id="pingzeScore">0</span>
+            </div>
+          </div>
+
+          <div class="score-card">
+            <div class="score-card-header">
+              <span class="score-card-icon">✍️</span>
+              <span class="score-card-title">对仗技术</span>
+              <span class="score-card-weight">30%</span>
+            </div>
+            <div class="score-card-body">
+              <div class="score-bar">
+                <div class="score-bar-fill" id="techniqueBar"></div>
+              </div>
+              <span class="score-card-value" id="techniqueScore">0</span>
+            </div>
+          </div>
+
+          <div class="score-card">
+            <div class="score-card-header">
+              <span class="score-card-icon">🎨</span>
+              <span class="score-card-title">艺术表现</span>
+              <span class="score-card-weight">30%</span>
+            </div>
+            <div class="score-card-body">
+              <div class="score-bar">
+                <div class="score-bar-fill" id="artisticBar"></div>
+              </div>
+              <span class="score-card-value" id="artisticScore">0</span>
+            </div>
+          </div>
+
+          <div class="score-card">
+            <div class="score-card-header">
+              <span class="score-card-icon">💫</span>
+              <span class="score-card-title">AI 印象</span>
+              <span class="score-card-weight">10%</span>
+            </div>
+            <div class="score-card-body">
+              <div class="score-bar">
+                <div class="score-bar-fill" id="impressionBar"></div>
+              </div>
+              <span class="score-card-value" id="impressionScore">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-section">
+          <div class="analysis-card">
+            <h3 class="analysis-title">
+              <span class="title-icon">💬</span>
+              AI 印象
+            </h3>
+            <p class="analysis-content" id="impressionReason"></p>
+          </div>
+
+          <div class="analysis-card">
+            <h3 class="analysis-title">
+              <span class="title-icon">📝</span>
+              技法点评
+            </h3>
+            <p class="analysis-content" id="techniqueComment"></p>
+          </div>
+
+          <div class="analysis-card">
+            <h3 class="analysis-title">
+              <span class="title-icon">🎭</span>
+              艺术赏析
+            </h3>
+            <p class="analysis-content" id="artisticComment"></p>
+          </div>
+
+          <div class="analysis-card" id="warningsCard">
+            <h3 class="analysis-title">
+              <span class="title-icon">⚠️</span>
+              注意事项
+            </h3>
+            <ul class="warnings-list" id="warningsList"></ul>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="action-button secondary" id="newAnalysisBtn">
+            <span class="button-icon">↻</span>
+            <span class="button-text">新的评鉴</span>
+          </button>
+          <button class="action-button" id="shareBtn">
+            <span class="button-icon">📤</span>
+            <span class="button-text">分享结果</span>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p class="footer-text">
+        PORM v4.1.0 · 基于 NLP+LLM 的企业级评分引擎
+      </p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
