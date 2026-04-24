@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "porm"
+version = "4.0.0"
+description = "Couplet Scoring System with Qwen3.5-9B-Instruct"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [{name = "porm contributors"}]
+keywords = ["chinese", "couplet", "nlp", "qwen"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pypinyin>=0.53.0",
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "openai>=1.0.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.1.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["porm*"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

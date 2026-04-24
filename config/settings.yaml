@@ -1,0 +1,101 @@
+# PORM 系统配置文件
+# 版本：4.0.0
+# 更新日期：2026-04-24
+
+# ====================
+# API 配置
+# ====================
+api:
+  max_retries: 3
+  retry_delay_seconds: 2.0
+  timeout_seconds: 180
+  
+  temperature_technique: 0.3
+  temperature_artistic: 0.4
+  temperature_impression: 0.4
+  
+  max_workers: 4
+  first_api_timeout: 300
+  model_timeout: 180
+
+# ====================
+# 评分权重
+# ====================
+scoring:
+  technique_weights:
+    qwen_cosine: 0.60
+    llm_technique: 0.20
+    llm_rhetoric: 0.20
+  
+  total_weights:
+    formal: 0.30
+    technique: 0.30
+    artistic: 0.30
+    impression: 0.10
+  
+  grade_thresholds:
+    excellent: 90
+    good: 75
+    pass: 60
+    fail: 0
+
+# ====================
+# NLP 模型配置
+# ====================
+model:
+  model_name: "Qwen3.5-9B-Instruct"
+  cache_dir: "./models"
+  
+  use_gpu: true
+  batch_size: 32
+  
+  normalization:
+    mean: 0.80
+    std: 0.10
+    min_observed: 0.50
+    max_observed: 0.95
+  
+  cache:
+    enabled: true
+    max_char_size: 10000
+    max_sentence_size: 2000
+    ttl_seconds: 3600
+
+# ====================
+# 日志配置
+# ====================
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  structured_logging: false
+  file_logging:
+    enabled: false
+    path: "./logs/porm.log"
+    max_size_mb: 10
+    backup_count: 5
+
+# ====================
+# 性能优化
+# ====================
+performance:
+  cache_strategy: "lru"
+  result_cache:
+    enabled: true
+    ttl_hours: 24
+    max_entries: 1000
+  streaming:
+    enabled: false
+    chunk_size: 20
+
+# ====================
+# 特性开关
+# ====================
+features:
+  saddle_engineering:
+    enabled: true
+    strict_mode: false
+  verbose_analysis:
+    enabled: true
+    max_char_display: 10
+  special_attention:
+    enabled: true
