@@ -146,7 +146,7 @@ app.add_middleware(
 )
 
 # 挂载静态文件目录
-frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
@@ -186,7 +186,7 @@ def _score_to_response(
 @app.get("/", response_class=FileResponse)
 async def root():
     """返回前端首页"""
-    index_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "index.html")
+    index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
     if os.path.exists(index_path):
         return index_path
     return {
