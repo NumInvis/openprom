@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 import json as json_module
 
 from porm.core.dual_api_scorer import DualAPITechniqueScorer, DualAPIScore
-from porm.engines.meter import MeterMatcher
+from porm.engines.meter import MeterEngine, MeterMatch
 from porm.engines.pingze import get_sequence
 from porm.utils.env_config import (
     get_api_key, get_base_url, get_model,
@@ -299,16 +299,18 @@ async def check_meter(request: MeterRequest):
     
     try:
         pingze_seq = get_sequence(request.text)
-        matcher = MeterMatcher()
+        engine = MeterEngine()
+        
+        lines = [request.text]
         
         if request.meter_type == "shi":
-            matched = matcher.find_best_shi_meter(request.text)
-            meters = [matched] if matched else []
+            matched = engine.find_best_shi(lines, top_k=1)
+            meters = [m.to_dict() for m in matched] if matched else []
         elif request.meter_type == "ci":
-            matched = matcher.find_best_ci_meter(request.text)
-            meters = [matched] if matched else []
+            matched = engine.find_best_ci(lines, top_k=1)
+            meters = [m.to_dict() for m in matched] if matched else []
         else:
-            meters = matcher.match_all_meters(request.text, request.meter_type)
+            raise HTTPException(status_code=400, detail=f"不支持的 meter_type: {request.meter_type}")
         
         violations = []
         for meter in meters:
@@ -326,6 +328,8 @@ async def check_meter(request: MeterRequest):
             is_compliant=len(violations) == 0
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"格律检测失败：{e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -335,20 +339,23 @@ async def check_meter(request: MeterRequest):
 async def list_meters(meter_type: Optional[str] = "all"):
     """列出所有可用的格律模板"""
     try:
-        matcher = MeterMatcher()
+        from porm.data.loader import MeterPattern
+        patterns = MeterPattern.get()
         
         if meter_type == "all":
             return {
-                "shi_meters": list(matcher.shi_meters.keys())[:20],
-                "ci_meters": list(matcher.ci_meters.keys())[:50]
+                "shi_meters": patterns.list_shi_patterns()[:20],
+                "ci_meters": patterns.list_ci_patterns()[:50]
             }
         elif meter_type == "shi":
-            return {"meters": list(matcher.shi_meters.keys())}
+            return {"meters": patterns.list_shi_patterns()}
         elif meter_type == "ci":
-            return {"meters": list(matcher.ci_meters.keys())}
+            return {"meters": patterns.list_ci_patterns()}
         else:
             raise HTTPException(status_code=400, detail="无效的 meter_type")
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"列出格律失败：{e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
