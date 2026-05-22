@@ -1,6 +1,6 @@
 """配置加载器
 
-版本：4.0.0
+版本：4.2.0
 """
 
 import yaml
@@ -28,9 +28,8 @@ class APIConfig:
 class ScoringConfig:
     """评分配置"""
     technique_weights: Dict[str, float] = field(default_factory=lambda: {
-        'qwen_cosine': 0.60,
-        'llm_technique': 0.20,
-        'llm_rhetoric': 0.20
+        'llm_technique': 0.50,
+        'llm_rhetoric': 0.50
     })
     total_weights: Dict[str, float] = field(default_factory=lambda: {
         'formal': 0.30,
@@ -44,35 +43,6 @@ class ScoringConfig:
         'pass': 60,
         'fail': 0
     })
-
-
-@dataclass
-class NormalizationConfig:
-    """归一化配置"""
-    mean: float = 0.80
-    std: float = 0.10
-    min_observed: float = 0.50
-    max_observed: float = 0.95
-
-
-@dataclass
-class CacheConfig:
-    """缓存配置"""
-    enabled: bool = True
-    max_char_size: int = 10000
-    max_sentence_size: int = 2000
-    ttl_seconds: int = 3600
-
-
-@dataclass
-class ModelConfig:
-    """模型配置"""
-    model_name: str = "Qwen3.5-9B-Instruct"
-    cache_dir: str = "./models"
-    use_gpu: bool = True
-    batch_size: int = 32
-    normalization: NormalizationConfig = field(default_factory=NormalizationConfig)
-    cache: CacheConfig = field(default_factory=CacheConfig)
 
 
 class Settings:
@@ -102,7 +72,6 @@ class Settings:
         candidates = [
             "config/settings.yaml",
             "../config/settings.yaml",
-            "D:/ai/porm/config/settings.yaml"
         ]
 
         for candidate in candidates:
@@ -123,7 +92,6 @@ class Settings:
 
         self.api = self._parse_api_config()
         self.scoring = self._parse_scoring_config()
-        self.model = self._parse_model_config()
 
     def _parse_api_config(self) -> APIConfig:
         api_dict = self._raw_config.get('api', {})
@@ -149,9 +117,8 @@ class Settings:
 
         return ScoringConfig(
             technique_weights={
-                'qwen_cosine': technique_weights.get('qwen_cosine', 0.60),
-                'llm_technique': technique_weights.get('llm_technique', 0.20),
-                'llm_rhetoric': technique_weights.get('llm_rhetoric', 0.20)
+                'llm_technique': technique_weights.get('llm_technique', 0.50),
+                'llm_rhetoric': technique_weights.get('llm_rhetoric', 0.50)
             },
             total_weights={
                 'formal': total_weights.get('formal', 0.30),
@@ -165,30 +132,6 @@ class Settings:
                 'pass': grade_thresholds.get('pass', 60),
                 'fail': grade_thresholds.get('fail', 0)
             }
-        )
-
-    def _parse_model_config(self) -> ModelConfig:
-        model_dict = self._raw_config.get('model', {})
-        norm_dict = model_dict.get('normalization', {})
-        cache_dict = model_dict.get('cache', {})
-
-        return ModelConfig(
-            model_name=model_dict.get('model_name', 'Qwen3.5-9B-Instruct'),
-            cache_dir=model_dict.get('cache_dir', './models'),
-            use_gpu=model_dict.get('use_gpu', True),
-            batch_size=model_dict.get('batch_size', 32),
-            normalization=NormalizationConfig(
-                mean=norm_dict.get('mean', 0.80),
-                std=norm_dict.get('std', 0.10),
-                min_observed=norm_dict.get('min_observed', 0.50),
-                max_observed=norm_dict.get('max_observed', 0.95)
-            ),
-            cache=CacheConfig(
-                enabled=cache_dict.get('enabled', True),
-                max_char_size=cache_dict.get('max_char_size', 10000),
-                max_sentence_size=cache_dict.get('max_sentence_size', 2000),
-                ttl_seconds=cache_dict.get('ttl_seconds', 3600)
-            )
         )
 
     def reload(self):
@@ -213,9 +156,3 @@ class Settings:
 def get_settings() -> Settings:
     """获取配置实例"""
     return Settings()
-
-
-if __name__ == "__main__":
-    settings = get_settings()
-    print(f"配置已加载：{settings._config_path}")
-    print(f"模型：{settings.model.model_name}")

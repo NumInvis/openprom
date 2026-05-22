@@ -1,20 +1,13 @@
 # 核心依赖
 pypinyin>=0.53.0
-transformers>=4.40.0
-torch>=2.0.0
 numpy>=1.24.0
 
 # LLM 客户端
 openai>=1.0.0
 
-# UI 和配置
-rich>=13.0.0
+# 配置
 pyyaml>=6.0
 jinja2>=3.0.0
-
-# 加速支持
-accelerate>=0.25.0
-sentencepiece>=0.2.0
 
 # REST API 服务
 fastapi>=0.104.0

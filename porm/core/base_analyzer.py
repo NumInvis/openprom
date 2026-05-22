@@ -79,7 +79,7 @@ def generate_overall_comment(formal_score: float, technique_score: float, artist
         parts.append("形式有待改进")
     
     if technique_score >= 0.8:
-        parts.append("对仗技法娴熟（基于BERT+LLM双重验证）")
+        parts.append("对仗技法娴熟")
     elif technique_score >= 0.6:
         parts.append("对仗尚可（经多维度算法验证）")
     

@@ -28,7 +28,6 @@ class CoupletScore:
     
     pingze_score: float = 0.0
     meter_violations: List[str] = field(default_factory=list)
-    nlp_duizhang: float = 0.0
     
     llm_technique: Dict[str, Any] = field(default_factory=dict)
     llm_artistic: Dict[str, Any] = field(default_factory=dict)
@@ -64,7 +63,6 @@ class CoupletScore:
             extra_data={
                 "pingze_score": self.pingze_score,
                 "meter_violations": self.meter_violations,
-                "nlp_duizhang": self.nlp_duizhang,
                 "llm_technique": self.llm_technique,
                 "llm_artistic": self.llm_artistic,
                 "llm_impression": self.llm_impression,
@@ -122,8 +120,6 @@ class CoupletAnalyzer(CoupletAnalyzerInterface):
         result.pingze_score = dual_result.pingze_score
         result.warnings = dual_result.warnings
         result.meter_violations = dual_result.warnings
-        
-        result.nlp_duizhang = dual_result.nlp_duizhang
         
         result.llm_technique = dual_result.llm_technique_evaluation
         result.llm_artistic = dual_result.llm_rhetoric_evaluation

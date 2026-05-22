@@ -326,7 +326,7 @@ class OutputController:
         """验证NLP与LLM结果一致性"""
         violations = []
         
-        nlp_score = context.nlp_features.get('semantic_similarity', 0.5)
+        nlp_score = context.nlp_features.get('pos_match_rate', 0.5)
         llm_score = context.llm_parsed_result.get('score', 50) / 100.0
         
         # 计算差异
@@ -364,7 +364,7 @@ class OutputController:
     
     def _apply_nlp_correction(self, context: ControlContext) -> ControlContext:
         """应用NLP修正"""
-        nlp_score = context.nlp_features.get('semantic_similarity', 0.5)
+        nlp_score = context.nlp_features.get('pos_match_rate', 0.5)
         llm_result = context.llm_parsed_result
         
         if 'score' in llm_result:

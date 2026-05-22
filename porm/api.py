@@ -85,7 +85,6 @@ class CoupletResponse(BaseModel):
     pingze_score: float
     warnings: List[str]
     comments: dict
-    qwen_analysis: Optional[dict] = None
     processing_time_ms: float
     cached: Optional[bool] = None
 
@@ -189,7 +188,6 @@ def _score_to_response(
         pingze_score=round(score.pingze_score, 4),
         warnings=score.warnings,
         comments=score.comments,
-        qwen_analysis=score.qwen_analysis,
         processing_time_ms=round(processing_time * 1000, 2),
         cached=False
     )
@@ -242,7 +240,7 @@ async def _generate_stream(upper: str, lower: str, start_time: float):
         yield f"data: {json_module.dumps({'event': 'formal_check', 'data': {'status': 'complete', 'formal_score': result.formal_score, 'pingze_score': result.pingze_score, 'warnings': result.warnings}, 'timestamp': time.time()})}\n\n"
         await asyncio.sleep(0.05)
         
-        yield f"data: {json_module.dumps({'event': 'technique_analysis', 'data': {'status': 'complete', 'technique_score': result.technique_score, 'qwen_similarity': result.qwen_cosine_similarity}, 'timestamp': time.time()})}\n\n"
+        yield f"data: {json_module.dumps({'event': 'technique_analysis', 'data': {'status': 'complete', 'technique_score': result.technique_score}, 'timestamp': time.time()})}\n\n"
         await asyncio.sleep(0.05)
         
         yield f"data: {json_module.dumps({'event': 'artistic_analysis', 'data': {'status': 'complete', 'artistic_score': result.artistic_score, 'impression_score': result.impression_score}, 'timestamp': time.time()})}\n\n"

@@ -105,14 +105,11 @@ class DualAPIAnalyzerAdapter(CoupletAnalyzerInterface):
             
             extra_data={
                 "first_impression_score": dual_result.first_impression_score,
-                "bert_cosine_similarity": dual_result.bert_cosine_similarity,
                 "llm_technique_score": dual_result.llm_technique_score,
                 "llm_rhetoric_score": dual_result.llm_rhetoric_score,
                 "special_attention": dual_result.special_attention,
-                "bert_detailed_analysis": dual_result.bert_detailed_analysis,
                 "final_technique_score": dual_result.final_technique_score,
-                "pingze_score": dual_result.pingze_score,
-                "nlp_duizhang": dual_result.nlp_duizhang
+                "pingze_score": dual_result.pingze_score
             }
         )
     
@@ -123,10 +120,9 @@ class DualAPIAnalyzerAdapter(CoupletAnalyzerInterface):
             "type": "dual_api",
             "features": [
                 "双阶段API调用",
-                "BERT句子级[CLS]编码",
-                "智能归一化(Z-score+Sigmoid)",
+                "加权评分",
                 "特别注意机制",
-                "加权评分(60/20/20)"
+                "NLP规则特征融合"
             ],
             "model": self._scorer.model
         }

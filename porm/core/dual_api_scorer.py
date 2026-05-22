@@ -1,12 +1,10 @@
 """双 API 技法评分系统
 
-版本：4.0.0
-模型：Qwen3.5-9B-Instruct
+版本：4.2.0
 
 功能：
     - 第一次 API 调用：第一印象评估
     - 第二次 API 调用：深度技法分析
-    - Qwen 语义相似度计算
     - 加权评分
 """
 
@@ -19,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 
 from porm.infrastructure.config import get_prompt_service, get_settings
-from porm.core.fusion_engine import FusionEngine
 from porm.core.saddle_engineering import SaddleEngineering
 from porm.core.base_analyzer import analyze_formal, generate_overall_comment
 from porm.utils import parse_llm_json_response, normalize_score, calculate_weighted_score
@@ -38,8 +35,6 @@ class DualAPIScore:
     first_impression_score: float = 0.0
     first_impression_reason: str = ""
     special_attention: Dict[str, Any] = field(default_factory=dict)
-    qwen_cosine_similarity: float = 0.0
-    qwen_analysis: Dict[str, Any] = field(default_factory=dict)
     llm_technique_score: float = 0.0
     llm_technique_evaluation: Dict[str, Any] = field(default_factory=dict)
     llm_rhetoric_score: float = 0.0
@@ -66,7 +61,6 @@ class DualAPITechniqueScorer:
         self._client = None
         self._client_lock = threading.Lock()
         self._prompt_service = get_prompt_service()
-        self._fusion_engine = FusionEngine(model_name="Qwen3.5-9B-Instruct")
         self._saddle = SaddleEngineering()
         self._executor = ThreadPoolExecutor(max_workers=4)
         self._healthy = True
@@ -80,9 +74,8 @@ class DualAPITechniqueScorer:
             self.TIMEOUT = settings.api.timeout
         except Exception:
             self.TECHNIQUE_WEIGHTS = {
-                'qwen_cosine': 0.60,
-                'llm_technique': 0.20,
-                'llm_rhetoric': 0.20
+                'llm_technique': 0.50,
+                'llm_rhetoric': 0.50
             }
             self.TOTAL_WEIGHTS = {
                 'formal': 0.30,
@@ -138,7 +131,6 @@ class DualAPITechniqueScorer:
                 if attempt < self.MAX_RETRIES - 1:
                     time.sleep(self.RETRY_DELAY)
 
-        # Return a conservative fallback with error marker
         return {"error": "API 调用失败", "score": 30, "confidence": 0.0, "fallback": True}, False
 
     def _first_api_call(self, upper: str, lower: str) -> Dict[str, Any]:
@@ -152,52 +144,21 @@ class DualAPITechniqueScorer:
 
         return result
 
-    def _compute_qwen_similarity(self, upper: str, lower: str) -> Dict[str, Any]:
-        logger.info("Qwen 语义相似度计算")
-
-        try:
-            if len(upper) != len(lower):
-                return {
-                    "cosine_similarity": 0.0,
-                    "normalized_similarity": 0.0,
-                    "error": "字数不等"
-                }
-
-            extractor = self._fusion_engine.feature_extractor
-            result = extractor.extract_semantic_features(upper, lower)
-
-            return {
-                "cosine_similarity": result.get("semantic_similarity", 0.0),
-                "normalized_similarity": result.get("normalized_similarity", 0.0),
-                "char_level_analysis": result.get("char_level_analysis", [])
-            }
-
-        except Exception as e:
-            logger.error(f"Qwen 计算失败：{e}")
-            return {
-                "cosine_similarity": 0.0,
-                "normalized_similarity": 0.0,
-                "error": str(e)
-            }
-
     def _second_api_call(
         self,
         upper: str,
         lower: str,
-        special_attention: Dict[str, Any],
-        qwen_analysis: Dict[str, Any]
+        special_attention: Dict[str, Any]
     ) -> Dict[str, Any]:
         logger.info("第二次 API 调用：深度分析")
 
         key_insights = json.dumps(special_attention, ensure_ascii=False)[:200]
-        qwen_score = qwen_analysis.get("normalized_similarity", 0.0)
 
         result, success = self._call_llm(
             "second_api_call",
             upper=upper,
             lower=lower,
-            key_insights=key_insights,
-            qwen_score=f"{qwen_score:.4f}"
+            key_insights=key_insights
         )
 
         return result
@@ -217,12 +178,8 @@ class DualAPITechniqueScorer:
             result.total_score = 0.0
             return result
 
-        # 步骤 2: 并行执行
-        future_first = self._executor.submit(self._first_api_call, upper, lower)
-        future_qwen = self._executor.submit(self._compute_qwen_similarity, upper, lower)
-
-        first_result = future_first.result(timeout=300)
-        qwen_result = future_qwen.result(timeout=180)
+        # 步骤 2: 第一印象
+        first_result = self._first_api_call(upper, lower)
 
         result.first_impression_score = normalize_score(
             first_result.get("first_impression_score", 0), max_score=100
@@ -230,13 +187,8 @@ class DualAPITechniqueScorer:
         result.first_impression_reason = first_result.get("first_impression_reason", "")
         result.special_attention = first_result.get("special_attention", {})
 
-        result.qwen_cosine_similarity = qwen_result.get("cosine_similarity", 0.0)
-        result.qwen_analysis = qwen_result
-
-        # 步骤 3: 第二次 API 调用
-        second_result = self._second_api_call(
-            upper, lower, result.special_attention, qwen_result
-        )
+        # 步骤 3: 深度技法分析
+        second_result = self._second_api_call(upper, lower, result.special_attention)
 
         result.llm_technique_score = normalize_score(
             second_result.get("technique_score", 0), max_score=100
@@ -249,17 +201,13 @@ class DualAPITechniqueScorer:
         result.llm_rhetoric_evaluation = second_result.get("rhetoric_evaluation", {})
 
         # 步骤 4: 计算最终分数
-        qwen_normalized = qwen_result.get("normalized_similarity", 0.0)
-
         scores = [
-            qwen_normalized,
             result.llm_technique_score,
             result.llm_rhetoric_score
         ]
         weights = [
-            self.TECHNIQUE_WEIGHTS.get('qwen_cosine', 0.60),
-            self.TECHNIQUE_WEIGHTS.get('llm_technique', 0.20),
-            self.TECHNIQUE_WEIGHTS.get('llm_rhetoric', 0.20)
+            self.TECHNIQUE_WEIGHTS.get('llm_technique', 0.50),
+            self.TECHNIQUE_WEIGHTS.get('llm_rhetoric', 0.50)
         ]
 
         final_technique = calculate_weighted_score(scores, weights)
@@ -269,7 +217,6 @@ class DualAPITechniqueScorer:
         result.artistic_score = result.llm_rhetoric_score
         result.impression_score = result.first_impression_score
 
-        # 计算总分
         total = (
             self.TOTAL_WEIGHTS['formal'] * result.formal_score +
             self.TOTAL_WEIGHTS['technique'] * result.technique_score +
@@ -277,17 +224,13 @@ class DualAPITechniqueScorer:
             self.TOTAL_WEIGHTS['impression'] * result.impression_score
         )
         result.total_score = round(total * 100, 1)
-
-        # Clamp score to valid range
         result.total_score = max(0.0, min(100.0, result.total_score))
 
-        # 评级
         for threshold, grade in [(90, "优秀"), (75, "良好"), (60, "及格"), (0, "不合格")]:
             if result.total_score >= threshold:
                 result.grade = grade
                 break
 
-        # 评语
         result.comments = {
             "technique_comment": result.llm_technique_evaluation.get("overall_technique_comment", ""),
             "artistic_comment": result.llm_rhetoric_evaluation.get("overall_rhetoric_comment", ""),

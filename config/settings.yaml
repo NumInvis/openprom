@@ -23,9 +23,8 @@ api:
 # ====================
 scoring:
   technique_weights:
-    qwen_cosine: 0.60
-    llm_technique: 0.20
-    llm_rhetoric: 0.20
+    llm_technique: 0.50
+    llm_rhetoric: 0.50
   
   total_weights:
     formal: 0.30
@@ -38,54 +37,6 @@ scoring:
     good: 75
     pass: 60
     fail: 0
-
-# ====================
-# NLP 模型配置
-# ====================
-model:
-  model_name: "Qwen3.5-9B-Instruct"
-  cache_dir: "./models"
-  
-  use_gpu: true
-  batch_size: 32
-  
-  normalization:
-    mean: 0.80
-    std: 0.10
-    min_observed: 0.50
-    max_observed: 0.95
-  
-  cache:
-    enabled: true
-    max_char_size: 10000
-    max_sentence_size: 2000
-    ttl_seconds: 3600
-
-# ====================
-# 日志配置
-# ====================
-logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  structured_logging: false
-  file_logging:
-    enabled: false
-    path: "./logs/porm.log"
-    max_size_mb: 10
-    backup_count: 5
-
-# ====================
-# 性能优化
-# ====================
-performance:
-  cache_strategy: "lru"
-  result_cache:
-    enabled: true
-    ttl_hours: 24
-    max_entries: 1000
-  streaming:
-    enabled: false
-    chunk_size: 20
 
 # ====================
 # 特性开关

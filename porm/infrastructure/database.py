@@ -44,7 +44,6 @@ class CoupletAnalysis(Base):
     grade = Column(String(20), default="")
     pingze_score = Column(Float, default=0.0)
     
-    qwen_analysis = Column(JSON, default=dict)
     llm_evaluation = Column(JSON, default=dict)
     warnings = Column(JSON, default=list)
     comments = Column(JSON, default=dict)
@@ -70,7 +69,6 @@ class CoupletAnalysis(Base):
             "total_score": self.total_score,
             "grade": self.grade,
             "pingze_score": self.pingze_score,
-            "qwen_analysis": self.qwen_analysis,
             "llm_evaluation": self.llm_evaluation,
             "warnings": self.warnings,
             "comments": self.comments,
@@ -91,7 +89,6 @@ class CoupletAnalysis(Base):
             total_score=score_result.total_score,
             grade=score_result.grade,
             pingze_score=score_result.pingze_score,
-            qwen_analysis=score_result.qwen_analysis,
             llm_evaluation={
                 "technique": score_result.llm_technique_evaluation,
                 "rhetoric": score_result.llm_rhetoric_evaluation
