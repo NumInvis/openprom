@@ -67,7 +67,7 @@ from porm.utils import (
     classify_similarity_level,
 )
 
-from porm.core.analyzer_interface import AnalysisResult
+from porm.core.analyzer_interface import AnalysisResult, CoupletAnalyzerInterface, create_analyzer
 
 __all__ = [
     "__version__",
