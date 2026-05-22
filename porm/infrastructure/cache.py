@@ -33,11 +33,15 @@ class CacheService:
     Redis 不可用时自动降级到内存缓存。
     """
     
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_url: Optional[str] = None, max_memory_size: int = 1000):
         self.redis_url = redis_url or get_redis_url()
         self._redis: Optional[redis.Redis] = None
         self._memory_cache: Dict[str, Any] = {}
+        self._memory_expiry: Dict[str, float] = {}
         self._enabled = is_cache_enabled()
+        self._max_memory_size = max_memory_size
+        self._hit_count = 0
+        self._miss_count = 0
         
         if self._enabled and REDIS_AVAILABLE:
             self._connect_redis()
@@ -69,15 +73,26 @@ class CacheService:
             try:
                 value = self._redis.get(cache_key)
                 if value:
+                    self._hit_count += 1
                     logger.debug(f"Redis 命中：{cache_key}")
                     return json.loads(value)
             except (RedisError, json.JSONDecodeError) as e:
                 logger.warning(f"Redis 读取失败：{e}")
         
+        # Check memory cache with TTL
+        now = __import__('time').time()
         if cache_key in self._memory_cache:
+            if cache_key in self._memory_expiry and self._memory_expiry[cache_key] < now:
+                # Expired
+                del self._memory_cache[cache_key]
+                del self._memory_expiry[cache_key]
+                self._miss_count += 1
+                return None
+            self._hit_count += 1
             logger.debug(f"内存缓存命中：{cache_key}")
             return self._memory_cache[cache_key]
         
+        self._miss_count += 1
         return None
     
     def set(
@@ -87,7 +102,7 @@ class CacheService:
         value: Any,
         ttl: Optional[timedelta] = None
     ):
-        """设置缓存"""
+        """设置缓存（带TTL和LRU淘汰）"""
         if not self._enabled:
             return
         
@@ -103,7 +118,16 @@ class CacheService:
             except (RedisError, TypeError) as e:
                 logger.warning(f"Redis 写入失败：{e}")
         
+        # LRU eviction for memory cache
+        if len(self._memory_cache) >= self._max_memory_size and cache_key not in self._memory_cache:
+            oldest_key = min(self._memory_expiry, key=lambda k: self._memory_expiry[k])
+            self._memory_cache.pop(oldest_key, None)
+            self._memory_expiry.pop(oldest_key, None)
+        
         self._memory_cache[cache_key] = value
+        # Set expiry: default 1 hour if no TTL
+        import time
+        self._memory_expiry[cache_key] = time.time() + (ttl.total_seconds() if ttl else 3600)
         logger.debug(f"内存缓存：{cache_key}")
     
     def delete(self, prefix: str, key: str) -> bool:
@@ -120,6 +144,7 @@ class CacheService:
         
         if cache_key in self._memory_cache:
             del self._memory_cache[cache_key]
+            self._memory_expiry.pop(cache_key, None)
             deleted = True
         
         return deleted
@@ -140,15 +165,23 @@ class CacheService:
         to_delete = [k for k in self._memory_cache if k.startswith(f"porm:{prefix}:")]
         for key in to_delete:
             del self._memory_cache[key]
+            self._memory_expiry.pop(key, None)
         
         logger.info(f"清除内存缓存：{len(to_delete)} 条")
     
     def get_stats(self) -> Dict[str, Any]:
         """获取缓存统计"""
+        total_requests = self._hit_count + self._miss_count
+        hit_rate = (self._hit_count / total_requests * 100) if total_requests > 0 else 0.0
+        
         stats = {
             "enabled": self._enabled,
             "redis_connected": self._redis is not None,
-            "memory_cache_size": len(self._memory_cache)
+            "memory_cache_size": len(self._memory_cache),
+            "memory_cache_max": self._max_memory_size,
+            "hit_count": self._hit_count,
+            "miss_count": self._miss_count,
+            "hit_rate_percent": round(hit_rate, 2)
         }
         
         if self._redis:

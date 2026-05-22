@@ -1,9 +1,9 @@
-"""PORM - 对联自动评分系统 v3.1
+"""PORM - 对联自动评分系统 v4.2
 
 基于 NLP + LLM 的企业级中文对联评分系统。
 """
 
-__version__ = "3.1.0"
+__version__ = "4.2.0"
 __author__ = "porm contributors"
 
 # Core
@@ -67,8 +67,6 @@ from porm.utils import (
     classify_similarity_level,
 )
 
-# UI (TUI uses extended AnalysisResult, but canonical is from core)
-from porm.ui import PormTUI, launch_tui
 from porm.core.analyzer_interface import AnalysisResult
 
 __all__ = [
@@ -121,8 +119,4 @@ __all__ = [
     "clamp_score",
     "load_config",
     "classify_similarity_level",
-    
-    # UI
-    "PormTUI",
-    "launch_tui",
 ]

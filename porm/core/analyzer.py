@@ -8,13 +8,7 @@ from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
 from porm.core.analyzer_interface import CoupletAnalyzerInterface, AnalysisResult
-from porm.core.base_analyzer import (
-    analyze_formal,
-    generate_overall_comment,
-    calculate_total_score,
-    determine_grade,
-)
-from porm.core.dual_api_scorer import DualAPITechniqueScorer, DualAPIScore
+from porm.core.dual_api_scorer import DualAPITechniqueScorer
 
 
 @dataclass
@@ -157,7 +151,7 @@ class CoupletAnalyzer(CoupletAnalyzerInterface):
         """获取分析器信息（CoupletAnalyzerInterface 实现）"""
         return {
             "name": "CoupletAnalyzer (Compatibility)",
-            "version": "3.0.0",
+            "version": "4.2.0",
             "type": "compatibility_layer",
             "description": "向后兼容包装层，内部委托给 DualAPITechniqueScorer",
             "features": [

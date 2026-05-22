@@ -39,17 +39,22 @@ def analyze_formal(upper: str, lower: str) -> Tuple[float, float, List[str]]:
         warnings.append("下联尾字非平声")
         ze_ping_score -= 0.5
     
-    # 三仄尾/三平尾
+    # Clamp ze_ping_score to [0, 1]
+    ze_ping_score = max(0.0, min(1.0, ze_ping_score))
+    
+    # 三仄尾/三平尾 (handle zhong tones gracefully)
     for name, tones in [("上联", u_tones), ("下联", l_tones)]:
         if len(tones) >= 3:
-            last3 = [t for t in tones[-3:] if t != 0]
-            if len(last3) == 3:
-                if all(t < 0 for t in last3):
-                    warnings.append(f"{name}三仄尾")
-                if all(t > 0 for t in last3):
-                    warnings.append(f"{name}三平尾")
+            last3 = tones[-3:]
+            # Count non-zhong tones
+            definite = [t for t in last3 if t != 0]
+            # If we have at least 2 definite tones and they are all same direction
+            if len(definite) >= 2 and all(t < 0 for t in definite):
+                warnings.append(f"{name}三仄尾")
+            if len(definite) >= 2 and all(t > 0 for t in definite):
+                warnings.append(f"{name}三平尾")
     
-    pingze_score = 0.7 * er_si_score + 0.3 * max(0, ze_ping_score)
+    pingze_score = 0.7 * er_si_score + 0.3 * ze_ping_score
     return pingze_score, pingze_score, warnings
 
 

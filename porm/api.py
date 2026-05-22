@@ -1,6 +1,6 @@
 """PORM REST API 服务
 
-版本：4.1.0
+版本：4.2.0
 功能:
     - 对联评分 API
     - 诗律检测 API
@@ -9,29 +9,31 @@
     - Prometheus 指标
 """
 
-import logging
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional, List
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 import json as json_module
-import os
 
 from porm.core.dual_api_scorer import DualAPITechniqueScorer, DualAPIScore
-from porm.engines.meter import MeterEngine, MeterMatch
+from porm.engines.meter import MeterEngine
 from porm.engines.pingze import get_sequence
 from porm.utils.env_config import (
     get_api_key, get_base_url, get_model,
     get_host, get_port, is_debug
 )
-from porm.infrastructure.config import get_settings
+from porm.infrastructure.database import db_manager
+from porm.infrastructure.cache import cache_service, get_cache_key_couplet
+from porm.infrastructure.logging import get_logger
 
 try:
     from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
@@ -39,11 +41,7 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
-logging.basicConfig(
-    level=logging.DEBUG if is_debug() else logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter(
@@ -89,6 +87,7 @@ class CoupletResponse(BaseModel):
     comments: dict
     qwen_analysis: Optional[dict] = None
     processing_time_ms: float
+    cached: Optional[bool] = None
 
 
 class MeterRequest(BaseModel):
@@ -122,6 +121,15 @@ async def lifespan(app: FastAPI):
     app.state.api_key = get_api_key()
     app.state.base_url = get_base_url()
     app.state.model = get_model()
+    
+    # Initialize database tables
+    try:
+        db_manager.create_tables()
+        logger.info("数据库表已初始化")
+    except Exception as e:
+        logger.warning(f"数据库初始化跳过：{e}")
+    
+    # Initialize scorer lazily on first request to avoid blocking startup
     app.state.scorer = None
     logger.info(f"使用模型：{app.state.model}")
     yield
@@ -130,10 +138,23 @@ async def lifespan(app: FastAPI):
         app.state.scorer.shutdown()
 
 
+def _ensure_scorer(app) -> DualAPITechniqueScorer:
+    """确保评分器已初始化（线程安全单例）"""
+    scorer = getattr(app.state, 'scorer', None)
+    if scorer is None:
+        scorer = DualAPITechniqueScorer(
+            api_key=getattr(app.state, 'api_key', get_api_key()),
+            base_url=getattr(app.state, 'base_url', get_base_url()),
+            model=getattr(app.state, 'model', get_model())
+        )
+        app.state.scorer = scorer
+    return scorer
+
+
 app = FastAPI(
     title="PORM API",
     description="对联自动评分系统 - 基于 NLP+LLM 的企业级评分引擎",
-    version="4.1.0",
+    version="4.2.0",
     lifespan=lifespan
 )
 
@@ -145,20 +166,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 挂载静态文件目录
-frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
-if os.path.exists(frontend_dir):
-    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
-
-
-def _get_scorer() -> DualAPITechniqueScorer:
-    """获取评分器实例"""
-    app.state.scorer = DualAPITechniqueScorer(
-        api_key=app.state.api_key,
-        base_url=app.state.base_url,
-        model=app.state.model
-    )
-    return app.state.scorer
+# 挂载静态文件目录（使用 pathlib）
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+if frontend_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 
 
 def _score_to_response(
@@ -179,19 +190,20 @@ def _score_to_response(
         warnings=score.warnings,
         comments=score.comments,
         qwen_analysis=score.qwen_analysis,
-        processing_time_ms=round(processing_time * 1000, 2)
+        processing_time_ms=round(processing_time * 1000, 2),
+        cached=False
     )
 
 
 @app.get("/", response_class=FileResponse)
 async def root():
     """返回前端首页"""
-    index_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
-    if os.path.exists(index_path):
-        return index_path
+    index_path = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
+    if index_path.exists():
+        return str(index_path)
     return {
         "name": "PORM API",
-        "version": "4.1.0",
+        "version": "4.2.0",
         "description": "对联自动评分系统",
         "docs": "/docs"
     }
@@ -200,31 +212,41 @@ async def root():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """健康检查"""
+    scorer = getattr(app.state, 'scorer', None)
+    scorer_health = True
+    if scorer is not None:
+        scorer_health = getattr(scorer, '_healthy', True)
+    
     return HealthResponse(
-        status="healthy",
-        version="4.1.0",
+        status="healthy" if scorer_health else "degraded",
+        version="4.2.0",
         timestamp=datetime.now().isoformat(),
-        model=app.state.model
+        model=getattr(app.state, 'model', get_model())
     )
 
 
 async def _generate_stream(upper: str, lower: str, start_time: float):
-    """生成流式响应"""
+    """生成流式响应（异步生成器）"""
     try:
         yield f"data: {json_module.dumps({'event': 'start', 'timestamp': time.time()})}\n\n"
+        await asyncio.sleep(0.05)
         
         yield f"data: {json_module.dumps({'event': 'formal_check', 'data': {'status': 'checking', 'message': '形式检测中...'}, 'timestamp': time.time()})}\n\n"
+        await asyncio.sleep(0.05)
         
-        scorer = _get_scorer()
-        result = scorer.analyze(upper, lower)
+        scorer = _ensure_scorer(app)
+        result = await asyncio.to_thread(scorer.analyze, upper, lower)
         
         processing_time = time.time() - start_time
         
         yield f"data: {json_module.dumps({'event': 'formal_check', 'data': {'status': 'complete', 'formal_score': result.formal_score, 'pingze_score': result.pingze_score, 'warnings': result.warnings}, 'timestamp': time.time()})}\n\n"
+        await asyncio.sleep(0.05)
         
         yield f"data: {json_module.dumps({'event': 'technique_analysis', 'data': {'status': 'complete', 'technique_score': result.technique_score, 'qwen_similarity': result.qwen_cosine_similarity}, 'timestamp': time.time()})}\n\n"
+        await asyncio.sleep(0.05)
         
         yield f"data: {json_module.dumps({'event': 'artistic_analysis', 'data': {'status': 'complete', 'artistic_score': result.artistic_score, 'impression_score': result.impression_score}, 'timestamp': time.time()})}\n\n"
+        await asyncio.sleep(0.05)
         
         final_result = _score_to_response(result, processing_time)
         yield f"data: {json_module.dumps({'event': 'complete', 'data': jsonable_encoder(final_result), 'timestamp': time.time()})}\n\n"
@@ -259,6 +281,16 @@ async def analyze_couplet(request: CoupletRequest):
                 detail=f"上下联字数不等：上联{len(request.upper)}字，下联{len(request.lower)}字"
             )
         
+        # Check cache
+        if request.enable_cache:
+            cache_key = get_cache_key_couplet(request.upper, request.lower)
+            cached = cache_service.get("couplet", cache_key)
+            if cached:
+                logger.info("缓存命中")
+                cached["cached"] = True
+                cached["processing_time_ms"] = 0.1
+                return CoupletResponse(**cached)
+        
         if request.stream:
             return StreamingResponse(
                 _generate_stream(request.upper, request.lower, start_time),
@@ -270,10 +302,25 @@ async def analyze_couplet(request: CoupletRequest):
                 }
             )
         
-        scorer = _get_scorer()
-        result = scorer.analyze(request.upper, request.lower)
+        scorer = _ensure_scorer(app)
+        result = await asyncio.to_thread(scorer.analyze, request.upper, request.lower)
         
         processing_time = time.time() - start_time
+        
+        response = _score_to_response(result, processing_time)
+        
+        # Save to database
+        try:
+            db_manager.save_couplet_analysis(result)
+        except Exception as db_err:
+            logger.warning(f"数据库保存失败：{db_err}")
+        
+        # Save to cache
+        if request.enable_cache:
+            try:
+                cache_service.set("couplet", cache_key, jsonable_encoder(response))
+            except Exception as cache_err:
+                logger.warning(f"缓存写入失败：{cache_err}")
         
         if PROMETHEUS_AVAILABLE:
             REQUEST_LATENCY.labels(
@@ -285,7 +332,7 @@ async def analyze_couplet(request: CoupletRequest):
                 status="success"
             ).inc()
         
-        return _score_to_response(result, processing_time)
+        return response
         
     except HTTPException:
         raise
@@ -327,7 +374,7 @@ async def check_meter(request: MeterRequest):
             if meter.get("match_rate", 1.0) < 0.8:
                 violations.append(f"格律匹配度不足：{meter.get('match_rate', 0):.2%}")
         
-        processing_time = time.time() - start_time
+        time.time() - start_time
         
         return MeterResponse(
             text=request.text,
@@ -368,6 +415,37 @@ async def list_meters(meter_type: Optional[str] = "all"):
         raise
     except Exception as e:
         logger.error(f"列出格律失败：{e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/couplet/history")
+async def get_couplet_history(limit: int = 20, offset: int = 0):
+    """获取评鉴历史记录"""
+    try:
+        records = db_manager.get_couplet_history(limit=limit, offset=offset)
+        return {
+            "total": len(records),
+            "offset": offset,
+            "limit": limit,
+            "records": [r.to_dict() for r in records]
+        }
+    except Exception as e:
+        logger.error(f"获取历史记录失败：{e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/couplet/statistics")
+async def get_couplet_statistics():
+    """获取评鉴统计信息"""
+    try:
+        stats = db_manager.get_statistics()
+        cache_stats = cache_service.get_stats()
+        return {
+            "database": stats,
+            "cache": cache_stats
+        }
+    except Exception as e:
+        logger.error(f"获取统计信息失败：{e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

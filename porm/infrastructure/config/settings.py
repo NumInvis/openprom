@@ -3,7 +3,6 @@
 版本：4.0.0
 """
 
-import os
 import yaml
 import threading
 from typing import Dict, Any, Optional

@@ -9,11 +9,12 @@
     - 评分算法实现
 """
 
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
 import logging
+import threading
 
 from porm.utils.common import classify_similarity_level
 from porm.utils.scoring import normalize_cosine_similarity
@@ -99,39 +100,46 @@ class FeatureExtractor:
         self.use_gpu = use_gpu
         self._model = None
         self._tokenizer = None
+        self._model_lock = threading.Lock()
+        self._model_loaded = False
 
     def _load_model(self) -> None:
-        """加载 Qwen 模型"""
-        if self._model is not None:
+        """加载 Qwen 模型（线程安全）"""
+        if self._model_loaded:
             return
 
-        try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            import torch
+        with self._model_lock:
+            if self._model_loaded:
+                return
 
-            model_path = f"{self.cache_dir}/{self.model_name}"
+            try:
+                from transformers import AutoModelForCausalLM, AutoTokenizer
 
-            logger.info(f"加载模型：{self.model_name}")
+                model_path = f"{self.cache_dir}/{self.model_name}"
+                logger.info(f"加载模型：{self.model_name}")
 
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                cache_dir=model_path,
-                trust_remote_code=True
-            )
+                self._tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name,
+                    cache_dir=model_path,
+                    trust_remote_code=True
+                )
 
-            self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                cache_dir=model_path,
-                device_map="auto" if self.use_gpu else None,
-                trust_remote_code=True
-            )
+                self._model = AutoModelForCausalLM.from_pretrained(
+                    self.model_name,
+                    cache_dir=model_path,
+                    device_map="auto" if self.use_gpu else None,
+                    trust_remote_code=True,
+                    output_hidden_states=True
+                )
 
-            self._model.eval()
-            logger.info("模型加载完成")
+                self._model.eval()
+                self._model_loaded = True
+                logger.info("模型加载完成")
 
-        except Exception as e:
-            logger.error(f"模型加载失败：{e}")
-            raise
+            except Exception as e:
+                logger.error(f"模型加载失败：{e}")
+                self._model_loaded = False
+                raise
 
     def extract_semantic_features(
         self,
@@ -222,7 +230,7 @@ class FeatureExtractor:
         upper: str,
         lower: str
     ) -> Dict[str, float]:
-        """提取句法特征"""
+        """提取句法特征（使用jieba分词+词性标注，如不可用则降级为字符分类）"""
         if len(upper) != len(lower) or len(upper) == 0:
             return {
                 "pos_match_rate": 0.0,
@@ -230,18 +238,50 @@ class FeatureExtractor:
                 "syntactic_congruence": 0.0
             }
 
-        match_count = 0
-        for u_char, l_char in zip(upper, lower):
-            if self._classify_char(u_char) == self._classify_char(l_char):
-                match_count += 1
+        try:
+            import jieba.posseg as pseg
+            u_pos = list(pseg.cut(upper))
+            l_pos = list(pseg.cut(lower))
 
-        pos_match = match_count / len(upper)
+            # Build character-level POS map
+            u_char_pos = []
+            for word, flag in u_pos:
+                for _ in word:
+                    u_char_pos.append(flag[0])  # Use first letter of POS tag
 
-        return {
-            "pos_match_rate": round(pos_match, 4),
-            "structure_parallelism": round(pos_match, 4),
-            "syntactic_congruence": round(pos_match, 4)
-        }
+            l_char_pos = []
+            for word, flag in l_pos:
+                for _ in word:
+                    l_char_pos.append(flag[0])
+
+            if len(u_char_pos) == len(l_char_pos) and len(u_char_pos) > 0:
+                pos_match = sum(1 for a, b in zip(u_char_pos, l_char_pos) if a == b) / len(u_char_pos)
+            else:
+                pos_match = 0.0
+
+            # Structure parallelism: compare word count ratios
+            u_words = len(u_pos)
+            l_words = len(l_pos)
+            structure_parallel = 1.0 - abs(u_words - l_words) / max(u_words, l_words, 1)
+
+            return {
+                "pos_match_rate": round(pos_match, 4),
+                "structure_parallelism": round(structure_parallel, 4),
+                "syntactic_congruence": round((pos_match + structure_parallel) / 2, 4)
+            }
+
+        except ImportError:
+            # Fallback to character classification
+            match_count = 0
+            for u_char, l_char in zip(upper, lower):
+                if self._classify_char(u_char) == self._classify_char(l_char):
+                    match_count += 1
+            pos_match = match_count / len(upper)
+            return {
+                "pos_match_rate": round(pos_match, 4),
+                "structure_parallelism": round(pos_match, 4),
+                "syntactic_congruence": round(pos_match, 4)
+            }
 
     def _classify_char(self, char: str) -> str:
         """字符分类"""
@@ -268,7 +308,7 @@ class FeatureExtractor:
         l_tones = get_sequence(lower)
 
         if len(u_tones) == len(l_tones) and len(u_tones) > 0:
-            opposite = sum(1 for u, l in zip(u_tones, l_tones) if u * l == -1)
+            opposite = sum(1 for u, lt in zip(u_tones, l_tones) if u * lt == -1)
             tonal_score = opposite / len(u_tones)
         else:
             tonal_score = 0.0
@@ -323,7 +363,21 @@ class FeatureExtractor:
 
 
 class WeightedAverageFusion:
-    """加权平均融合"""
+    """加权平均融合（带特征归一化）"""
+
+    # Feature-specific weights based on importance
+    FEATURE_WEIGHTS = np.array([
+        0.25,  # semantic_similarity
+        0.20,  # word_embedding_sim
+        0.10,  # contextual_sim
+        0.15,  # pos_match_rate
+        0.10,  # structure_parallelism
+        0.05,  # syntactic_congruence
+        0.05,  # tonal_pattern_score
+        0.05,  # rhythm_harmony
+        0.03,  # char_overlap_ratio
+        0.02,  # length_balance
+    ])
 
     def __init__(self, nlp_weight: float = 0.4, llm_weight: float = 0.6):
         self.nlp_weight = nlp_weight
@@ -335,44 +389,84 @@ class WeightedAverageFusion:
         llm_output: LLMOutput
     ) -> FusionResult:
         nlp_vector = nlp_features.to_vector()
-        nlp_score = float(np.mean(nlp_vector)) * 100
+
+        # Normalize each feature to [0, 1] (most already are, but ensure consistency)
+        nlp_vector = np.clip(nlp_vector, 0.0, 1.0)
+
+        # Weighted average of NLP features
+        nlp_score = float(np.dot(nlp_vector, self.FEATURE_WEIGHTS)) * 100
         llm_score = llm_output.raw_score
 
         final_score = self.nlp_weight * nlp_score + self.llm_weight * llm_score
 
+        # Calculate fusion confidence based on agreement
+        agreement = 1.0 - min(abs(nlp_score - llm_score) / 100.0, 1.0)
+        confidence = 0.5 + 0.5 * agreement
+
         return FusionResult(
             final_score=round(final_score, 2),
-            nlp_contribution=nlp_score,
-            llm_contribution=llm_score,
-            fusion_confidence=0.8,
+            nlp_contribution=round(nlp_score, 2),
+            llm_contribution=round(llm_score, 2),
+            fusion_confidence=round(confidence, 2),
             decision_basis=[
-                f"NLP 得分：{nlp_score:.2f}",
-                f"LLM 得分：{llm_score:.2f}"
-            ]
+                f"NLP 加权得分：{nlp_score:.2f}",
+                f"LLM 原始得分：{llm_score:.2f}",
+                f"一致性：{agreement:.2%}"
+            ],
+            feature_importance={
+                "semantic": 0.25, "embedding": 0.20, "contextual": 0.10,
+                "pos_match": 0.15, "structure": 0.10, "syntax": 0.05,
+                "tonal": 0.05, "rhythm": 0.05, "overlap": 0.03, "balance": 0.02
+            }
         )
 
 
 class BayesianFusion:
-    """贝叶斯融合"""
+    """高斯贝叶斯融合
 
-    def __init__(self, sigma: float = 0.15):
-        self.sigma = sigma
+    假设 NLP 和 LLM 的评分都是真实分数的带噪声观测：
+    P(Score|NLP,LLM) ∝ P(NLP|Score) * P(LLM|Score) * P(Score)
+
+    使用高斯似然，后验均值是加权平均。
+    """
+
+    def __init__(self, nlp_sigma: float = 15.0, llm_sigma: float = 12.0, prior_sigma: float = 25.0):
+        self.nlp_sigma = nlp_sigma
+        self.llm_sigma = llm_sigma
+        self.prior_sigma = prior_sigma
 
     def fuse(
         self,
         nlp_features: NLPFeatures,
         llm_output: LLMOutput
     ) -> FusionResult:
-        nlp_score = float(np.mean(nlp_features.to_vector())) * 100
+        nlp_vector = np.clip(nlp_features.to_vector(), 0.0, 1.0)
+        nlp_score = float(np.dot(nlp_vector, WeightedAverageFusion.FEATURE_WEIGHTS)) * 100
         llm_score = llm_output.raw_score
 
-        final_score = (nlp_score + llm_score) / 2
+        # Precision (inverse variance)
+        tau_nlp = 1.0 / (self.nlp_sigma ** 2)
+        tau_llm = 1.0 / (self.llm_sigma ** 2)
+        tau_prior = 1.0 / (self.prior_sigma ** 2)
+
+        # Posterior precision and mean (assuming prior mean = 50)
+        tau_post = tau_nlp + tau_llm + tau_prior
+        mu_post = (tau_nlp * nlp_score + tau_llm * llm_score + tau_prior * 50.0) / tau_post
+
+        # Posterior standard deviation
+        sigma_post = np.sqrt(1.0 / tau_post)
+        confidence = 1.0 - min(sigma_post / self.prior_sigma, 1.0)
 
         return FusionResult(
-            final_score=round(final_score, 2),
-            nlp_contribution=nlp_score,
-            llm_contribution=llm_score,
-            fusion_confidence=0.75
+            final_score=round(mu_post, 2),
+            nlp_contribution=round(nlp_score, 2),
+            llm_contribution=round(llm_score, 2),
+            fusion_confidence=round(confidence, 2),
+            decision_basis=[
+                f"NLP 观测：{nlp_score:.2f} (σ={self.nlp_sigma})",
+                f"LLM 观测：{llm_score:.2f} (σ={self.llm_sigma})",
+                f"后验均值：{mu_post:.2f} (σ={sigma_post:.2f})"
+            ]
         )
 
 

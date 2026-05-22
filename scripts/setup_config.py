@@ -44,7 +44,7 @@ def setup_config():
     print(f"  - 模型：{model}")
     print(f"  - Base URL: {base_url}")
     print("\n提示：建议将敏感信息设置在 .env 文件中")
-    print("运行：python -m porm.ui.tui 启动 TUI 界面")
+    print("运行：python -m porm.api 启动 API 服务")
 
 
 if __name__ == "__main__":

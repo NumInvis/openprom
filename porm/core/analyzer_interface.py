@@ -119,7 +119,7 @@ class DualAPIAnalyzerAdapter(CoupletAnalyzerInterface):
     def get_analyzer_info(self) -> Dict[str, Any]:
         return {
             "name": "Dual-API Technique Scorer",
-            "version": "3.1.0",
+            "version": "4.2.0",
             "type": "dual_api",
             "features": [
                 "双阶段API调用",

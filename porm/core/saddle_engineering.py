@@ -10,7 +10,7 @@
 4. 可追溯：完整的决策链路记录
 """
 
-from typing import Dict, List, Optional, Any, Tuple, Callable
+from typing import Dict, List, Any, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import re
@@ -337,7 +337,7 @@ class OutputController:
             violations.append(ConstraintViolation(
                 constraint_type=ConstraintType.SEMANTIC,
                 field="nlp_llm_agreement",
-                expected=f"差异 < 0.3",
+                expected="差异 < 0.3",
                 actual=f"差异 = {diff:.2f}",
                 severity=min(diff, 1.0),
                 message=f"NLP与LLM评分差异过大: NLP={nlp_score:.2f}, LLM={llm_score:.2f}"

@@ -16,10 +16,11 @@ import time
 from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor
+import threading
 
 from porm.infrastructure.config import get_prompt_service, get_settings
 from porm.core.fusion_engine import FusionEngine
-from porm.core.saddle_engineering import SaddleEngineering, ControlContext
+from porm.core.saddle_engineering import SaddleEngineering
 from porm.core.base_analyzer import analyze_formal, generate_overall_comment
 from porm.utils import parse_llm_json_response, normalize_score, calculate_weighted_score
 
@@ -63,10 +64,12 @@ class DualAPITechniqueScorer:
         self.base_url = base_url
         self.model = model
         self._client = None
+        self._client_lock = threading.Lock()
         self._prompt_service = get_prompt_service()
         self._fusion_engine = FusionEngine(model_name="Qwen3.5-9B-Instruct")
         self._saddle = SaddleEngineering()
         self._executor = ThreadPoolExecutor(max_workers=4)
+        self._healthy = True
 
         try:
             settings = get_settings()
@@ -103,10 +106,14 @@ class DualAPITechniqueScorer:
             self._executor.shutdown(wait=True)
 
     def _get_client(self):
-        if self._client is None:
+        if self._client is not None:
+            return self._client
+        with self._client_lock:
+            if self._client is not None:
+                return self._client
             from openai import OpenAI
             self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-        return self._client
+            return self._client
 
     def _call_llm(self, prompt_name: str, **vars) -> Tuple[Dict[str, Any], bool]:
         prompt_template = self._prompt_service.get_prompt(prompt_name)
@@ -131,7 +138,8 @@ class DualAPITechniqueScorer:
                 if attempt < self.MAX_RETRIES - 1:
                     time.sleep(self.RETRY_DELAY)
 
-        return {"error": "API 调用失败", "score": 50}, False
+        # Return a conservative fallback with error marker
+        return {"error": "API 调用失败", "score": 30, "confidence": 0.0, "fallback": True}, False
 
     def _first_api_call(self, upper: str, lower: str) -> Dict[str, Any]:
         logger.info("第一次 API 调用：第一印象评估")
@@ -269,6 +277,9 @@ class DualAPITechniqueScorer:
             self.TOTAL_WEIGHTS['impression'] * result.impression_score
         )
         result.total_score = round(total * 100, 1)
+
+        # Clamp score to valid range
+        result.total_score = max(0.0, min(100.0, result.total_score))
 
         # 评级
         for threshold, grade in [(90, "优秀"), (75, "良好"), (60, "及格"), (0, "不合格")]:

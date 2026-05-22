@@ -14,5 +14,5 @@ versions:
     metadata:
       author: porm-system
       version: "3.0"
-      description: 第二次API调用 - 精简版（v3: 减少输入长度，提升响应速度）
+      description: "第二次API调用 - 精简版（v3: 减少输入长度，提升响应速度）"
       changes: "精简了BERT详细数据，仅保留核心指标；压缩特别注意内容到200字以内"

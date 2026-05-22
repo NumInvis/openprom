@@ -7,7 +7,6 @@
     - 数据迁移支持
 """
 
-import json
 import logging
 from datetime import datetime
 from typing import Optional, List, Any, Dict
@@ -15,10 +14,10 @@ from contextlib import contextmanager
 
 from sqlalchemy import (
     create_engine, Column, Integer, String, Float,
-    DateTime, JSON, Text, Index, func
+    DateTime, JSON, Index, func
 )
 from sqlalchemy.orm import (
-    declarative_base, sessionmaker, Session
+    declarative_base, sessionmaker
 )
 from sqlalchemy.pool import StaticPool
 
@@ -193,12 +192,17 @@ class DatabaseManager:
             session.add(record)
             session.flush()
             logger.debug(f"保存对联分析记录：ID={record.id}")
+            # Detach from session so it can be used after context exits
+            session.expunge(record)
             return record
     
     def get_couplet_analysis(self, record_id: int) -> Optional[CoupletAnalysis]:
         """获取对联分析记录"""
         with self.get_session() as session:
-            return session.get(CoupletAnalysis, record_id)
+            record = session.get(CoupletAnalysis, record_id)
+            if record:
+                session.expunge(record)
+            return record
     
     def get_couplet_history(
         self,
@@ -207,11 +211,14 @@ class DatabaseManager:
     ) -> List[CoupletAnalysis]:
         """获取历史记录"""
         with self.get_session() as session:
-            return session.query(CoupletAnalysis)\
+            records = session.query(CoupletAnalysis)\
                 .order_by(CoupletAnalysis.created_at.desc())\
                 .offset(offset)\
                 .limit(limit)\
                 .all()
+            for r in records:
+                session.expunge(r)
+            return records
     
     def search_couplets(
         self,
@@ -221,7 +228,7 @@ class DatabaseManager:
         """搜索对联"""
         with self.get_session() as session:
             pattern = f"%{keyword}%"
-            return session.query(CoupletAnalysis)\
+            records = session.query(CoupletAnalysis)\
                 .filter(
                     (CoupletAnalysis.upper.like(pattern)) |
                     (CoupletAnalysis.lower.like(pattern))
@@ -229,6 +236,9 @@ class DatabaseManager:
                 .order_by(CoupletAnalysis.created_at.desc())\
                 .limit(limit)\
                 .all()
+            for r in records:
+                session.expunge(r)
+            return records
     
     def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息"""

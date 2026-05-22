@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import IntEnum
 
+import threading
 from porm.data.loader import MeterPattern
 from porm.engines.pingze import get_sequence
 
@@ -75,16 +76,16 @@ class MeterEngine:
 
             if p == TonePattern.PING_REQUIRED:
                 expected_tone = "平"
-                is_match = (t == 1)
+                is_match = (t == 1)  # Must be ping, zhong (0) is not acceptable
             elif p == TonePattern.ZE_REQUIRED:
                 expected_tone = "仄"
-                is_match = (t == -1)
+                is_match = (t == -1)  # Must be ze, zhong (0) is not acceptable
             elif p == TonePattern.PING:
                 expected_tone = "平"
-                is_match = (t == 1)
+                is_match = (t == 1 or t == 0)  # Ping or zhong is acceptable
             elif p == TonePattern.ZE:
                 expected_tone = "仄"
-                is_match = (t == -1)
+                is_match = (t == -1 or t == 0)  # Ze or zhong is acceptable
 
             if is_match:
                 match_count += 1
@@ -207,15 +208,18 @@ class MeterEngine:
         return self.find_best_patterns(lines, "ci", top_k)
 
 
-# 全局引擎实例
+# 全局引擎实例（线程安全）
 _engine: Optional[MeterEngine] = None
+_engine_lock: threading.Lock = threading.Lock()
 
 
 def get_engine(threshold: float = MeterEngine.DEFAULT_VALID_THRESHOLD) -> MeterEngine:
-    """获取全局引擎实例"""
+    """获取全局引擎实例（线程安全）"""
     global _engine
     if _engine is None:
-        _engine = MeterEngine(threshold=threshold)
+        with _engine_lock:
+            if _engine is None:
+                _engine = MeterEngine(threshold=threshold)
     return _engine
 
 

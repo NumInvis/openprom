@@ -11,10 +11,10 @@ import json
 import logging
 import sys
 from datetime import datetime
-from typing import Optional, Dict, Any
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from typing import Optional
+from logging.handlers import RotatingFileHandler
 
-from porm.utils.env_config import get_log_level, get_log_format, is_debug
+from porm.utils.env_config import get_log_level, get_log_format
 
 
 class JSONFormatter(logging.Formatter):
@@ -66,6 +66,11 @@ class TextFormatter(logging.Formatter):
             f"{color}{timestamp} - {record.name} - {record.levelname} - "
             f"{record.getMessage()}{self.RESET}"
         )
+
+
+def get_logger(name: str = "porm") -> logging.Logger:
+    """获取或创建logger（兼容logging.getLogger）"""
+    return setup_logging(name=name)
 
 
 def setup_logging(
