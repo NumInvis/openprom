@@ -121,7 +121,7 @@ pip install -r requirements.txt
 ```bash
 # API 配置（必需）
 OPENPROM_API_KEY=your_api_key_here
-OPENPROM_BASE_URL=https://proxy.pieixan.icu/v1
+OPENPROM_BASE_URL=https://your-llm-gateway.example.com/ai/v1
 OPENPROM_MODEL=Qwen3.5-9B-Instruct
 
 # 服务配置（可选）
@@ -191,7 +191,7 @@ docker run -d \
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `OPENPROM_API_KEY` | API 密钥 | 无（必需） |
-| `OPENPROM_BASE_URL` | API Base URL | `https://proxy.pieixan.icu/v1` |
+| `OPENPROM_BASE_URL` | API Base URL | `https://your-llm-gateway.example.com/ai/v1` |
 | `OPENPROM_MODEL` | 模型名称 | `Qwen3.5-9B-Instruct` |
 | `OPENPROM_DATABASE_URL` | 数据库 URL | `sqlite:///./data/openprom.db` |
 | `OPENPROM_REDIS_URL` | Redis URL | `redis://redis:6379/0` |

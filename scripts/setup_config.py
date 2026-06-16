@@ -19,9 +19,9 @@ def setup_config():
     if not api_key:
         api_key = input("请输入 API 密钥 (或按回车使用环境变量): ").strip()
     
-    base_url = input("API Base URL [https://proxy.pieixan.icu/v1]: ").strip()
+    base_url = input("API Base URL [https://your-llm-gateway.example.com/ai/v1]: ").strip()
     if not base_url:
-        base_url = "https://proxy.pieixan.icu/v1"
+        base_url = "https://your-llm-gateway.example.com/ai/v1"
     
     model = input("模型名称 [Qwen3.5-9B-Instruct]: ").strip()
     if not model:
@@ -31,7 +31,7 @@ def setup_config():
         "api_key": api_key,
         "base_url": base_url,
         "model": model,
-        "_note": "建议将 API 密钥设置在 .env 文件中或使用 OPENPROM_API_KEY 环境变量"
+        "_note": "建议将 API 密钥设置在 .env 文件中或使用 OPENPROM_API_KEY 环境变量（本文件不应提交到仓库）"
     }
     
     config_path = Path(__file__).resolve().parent.parent / "config.json"

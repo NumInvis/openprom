@@ -59,7 +59,7 @@ def get_base_url() -> str:
         except Exception as e:
             logger.warning(f"读取配置文件失败：{e}")
     
-    return "https://wincode.winning.com.cn/ai/v1"
+    return "https://your-llm-gateway.example.com/ai/v1"
 
 
 def get_model() -> str:

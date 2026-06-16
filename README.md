@@ -1,8 +1,8 @@
 # OpenPROM - 诗词 AI 助手
 
 版本：4.3.0  
-模型：qwen3.7-plus  
-LLM 端点：`https://wincode.winning.com.cn/ai/v1`  
+模型：your-model-name  
+LLM 端点：`https://your-llm-gateway.example.com/ai/v1`  
 许可证：MIT
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -146,8 +146,8 @@ print(f"评语：{result.comments}")
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `OPENPROM_API_KEY` | API 密钥 | 必需 |
-| `OPENPROM_BASE_URL` | API Base URL | `https://wincode.winning.com.cn/ai/v1/chat` |
-| `OPENPROM_MODEL` | 模型名称 | `qwen3.7-plus` |
+| `OPENPROM_BASE_URL` | API Base URL | `https://your-llm-gateway.example.com/ai/v1` |
+| `OPENPROM_MODEL` | 模型名称 | `your-model-name` |
 | `OPENPROM_DATABASE_URL` | 数据库 URL | `sqlite:///./openprom.db` |
 | `OPENPROM_REDIS_URL` | Redis URL | `redis://localhost:6379/0` |
 | `OPENPROM_CACHE_ENABLED` | 启用缓存 | `false` |

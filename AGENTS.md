@@ -23,7 +23,7 @@ docker-compose up -d
 ## Required setup
 
 - Copy `.env.example` to `.env` and set `OPENPROM_API_KEY` — the server fails without it
-- Default LLM base URL is `https://wincode.winning.com.cn/ai/v1` with model `qwen3.7-plus`
+- Set `OPENPROM_BASE_URL` to your LLM gateway (e.g. `https://your-llm-gateway.example.com/ai/v1`) and `OPENPROM_MODEL` to your model name
 - `config.json` is gitignored (holds secrets); env vars take precedence over it
 
 ## Architecture

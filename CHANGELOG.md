@@ -28,8 +28,8 @@
 
 ### 配置更新
 
-- 默认 LLM 端点改为 `https://wincode.winning.com.cn/ai/v1/chat`
-- 默认模型改为 `qwen3.7-plus`
+- 默认 LLM 端点改为 `https://your-llm-gateway.example.com/ai/v1`
+- 默认模型改为 `your-model-name`
 - `config/settings.yaml` 新增 `tools`、`generation`、`agent` 配置段
 
 ### 前端升级

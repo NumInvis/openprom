@@ -7,7 +7,7 @@ services:
       - "8000:8000"
     environment:
       - OPENPROM_API_KEY=${OPENPROM_API_KEY:-}
-      - OPENPROM_BASE_URL=${OPENPROM_BASE_URL:-https://proxy.pieixan.icu/v1}
+      - OPENPROM_BASE_URL=${OPENPROM_BASE_URL:-https://your-llm-gateway.example.com/ai/v1}
       - OPENPROM_MODEL=${OPENPROM_MODEL:-Qwen3.5-9B-Instruct}
       - OPENPROM_DATABASE_URL=sqlite:///./data/openprom.db
       - OPENPROM_REDIS_URL=redis://redis:6379/0
