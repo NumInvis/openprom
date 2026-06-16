@@ -3,13 +3,13 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "porm"
-version = "4.2.0"
-description = "Couplet Scoring System"
+name = "openprom"
+version = "4.3.0"
+description = "Poetry AI Assistant"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
-authors = [{name = "porm contributors"}]
+authors = [{name = "OpenPROM contributors"}]
 keywords = ["chinese", "couplet", "nlp"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -24,14 +24,26 @@ dependencies = [
     "openai>=1.0.0",
     "pyyaml>=6.0",
     "jinja2>=3.0.0",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "python-multipart>=0.0.6",
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.19.0",
+    "redis>=5.0.0",
+    "prometheus-client>=0.19.0",
+    "chromadb>=0.4.0",
+    "sentence-transformers>=2.2.0",
+    "rank-bm25>=0.2.2",
+    "jieba>=0.42.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "ruff>=0.1.0"]
+dev = ["pytest>=7.0", "ruff>=0.1.0", "httpx>=0.25.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["porm*"]
+include = ["openprom*"]
 
 [tool.ruff]
 target-version = "py39"

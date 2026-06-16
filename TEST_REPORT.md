@@ -1,4 +1,4 @@
-# PORM v4.1.0 测试报告
+# OpenPROM v4.1.0 测试报告
 
 测试日期：2026-04-24  
 测试版本：4.1.0  
@@ -152,7 +152,7 @@ calculate_weighted_score([80,90,70], [0.5,0.3,0.2]) = 81.00
 
 **测试结果**:
 ```
-API 名称：PORM API
+API 名称：OpenPROM API
 API 版本：4.1.0
 路由数量：9
 CoupletRequest: upper=测试，lower=测试
@@ -197,14 +197,14 @@ SaddleEngineering: [OK]
 
 **启动命令**:
 ```bash
-python -m porm.api
+python -m openprom.api
 ```
 
 **启动日志**:
 ```
 INFO:     Started server process [29488]
 INFO:     Waiting for application startup.
-INFO:     PORM API 服务启动中...
+INFO:     OpenPROM API 服务启动中...
 INFO:     使用模型：Qwen3.5-9B-Instruct
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000
@@ -221,7 +221,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 
 **测试命令**:
 ```bash
-python -m porm.main list shi
+python -m openprom.main list shi
 ```
 
 **输出**:
@@ -240,7 +240,7 @@ python -m porm.main list shi
 
 **导入测试**:
 ```python
-from porm.ui.tui import PormTUI
+from openprom.ui.tui import PormTUI
 ```
 
 **验证结果**: ✅ TUI 模块导入成功
@@ -294,7 +294,7 @@ from porm.ui.tui import PormTUI
 
 ## 测试结论
 
-**PORM v4.1.0 已通过所有基础测试，可以部署使用。**
+**OpenPROM v4.1.0 已通过所有基础测试，可以部署使用。**
 
 ### 测试覆盖的功能模块:
 
@@ -324,7 +324,7 @@ from porm.ui.tui import PormTUI
 ### 运行完整测试
 
 ```bash
-cd porm
+cd openprom
 pip install -e .
 python tests/test_integration.py
 ```
@@ -333,7 +333,7 @@ python tests/test_integration.py
 
 ```bash
 # 启动服务
-python -m porm.api
+python -m openprom.api
 
 # 测试健康检查
 curl http://localhost:8000/health
@@ -351,19 +351,19 @@ curl -X POST "http://localhost:8000/api/v1/couplet/analyze" \
 
 ```bash
 # 列出诗体
-python -m porm.main list shi
+python -m openprom.main list shi
 
 # 列出词牌
-python -m porm.main list ci
+python -m openprom.main list ci
 
 # 对联评分
-python -m porm.main couplet "春风化雨" "秋月寒霜"
+python -m openprom.main couplet "春风化雨" "秋月寒霜"
 ```
 
 ### 测试 TUI
 
 ```bash
-python -m porm.ui.tui
+python -m openprom.ui.tui
 ```
 
 ---

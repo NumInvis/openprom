@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PORM 配置设置脚本
+"""OpenPROM 配置设置脚本
 
 自动配置 API 密钥、模型和站点信息。
 从 scripts/ 目录运行时，config.json 会写入项目根目录。
@@ -12,10 +12,10 @@ from pathlib import Path
 
 def setup_config():
     """设置配置文件"""
-    print("PORM 配置设置")
+    print("OpenPROM 配置设置")
     print("=" * 50)
     
-    api_key = os.getenv("PORM_API_KEY", "")
+    api_key = os.getenv("OPENPROM_API_KEY", "")
     if not api_key:
         api_key = input("请输入 API 密钥 (或按回车使用环境变量): ").strip()
     
@@ -31,7 +31,7 @@ def setup_config():
         "api_key": api_key,
         "base_url": base_url,
         "model": model,
-        "_note": "建议将 API 密钥设置在 .env 文件中或使用 PORM_API_KEY 环境变量"
+        "_note": "建议将 API 密钥设置在 .env 文件中或使用 OPENPROM_API_KEY 环境变量"
     }
     
     config_path = Path(__file__).resolve().parent.parent / "config.json"
@@ -44,7 +44,7 @@ def setup_config():
     print(f"  - 模型：{model}")
     print(f"  - Base URL: {base_url}")
     print("\n提示：建议将敏感信息设置在 .env 文件中")
-    print("运行：python -m porm.api 启动 API 服务")
+    print("运行：python -m openprom.api 启动 API 服务")
 
 
 if __name__ == "__main__":

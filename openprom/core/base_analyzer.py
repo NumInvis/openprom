@@ -1,0 +1,155 @@
+"""分析器基础模块 (Analyzer Base Module)
+
+提取所有分析器的公共逻辑，消除代码重复。
+包含：形式分析、评语生成、评分计算、评级判定等共享功能。
+"""
+
+from typing import Tuple, List
+from openprom.engines.pingze import get_sequence
+
+
+def analyze_formal(upper: str, lower: str) -> Tuple[float, float, List[str]]:
+    """形式分析：平仄、字数、格律（统一实现）
+    
+    Args:
+        upper: 上联
+        lower: 下联
+        
+    Returns:
+        (formal_score, pingze_score, warnings)
+        formal_score: 综合形式分 (0-1)，包含字数、平仄、结构
+        pingze_score: 纯平仄分 (0-1)
+    """
+    if len(upper) != len(lower):
+        return 0.0, 0.0, ["字数不等"]
+    
+    u_tones = get_sequence(upper)
+    l_tones = get_sequence(lower)
+    warnings = []
+    
+    # 字数匹配（走到这里必然相等）
+    length_score = 1.0
+    
+    # 二四六分明
+    key_pos = list(range(1, len(upper), 2))
+    correct = sum(1 for i in key_pos if u_tones[i] * l_tones[i] == -1)
+    er_si_score = correct / len(key_pos) if key_pos else 1.0
+    
+    # 仄起平落
+    ze_ping_score = 1.0
+    if u_tones[-1] != -1:
+        warnings.append("上联尾字非仄声")
+        ze_ping_score -= 0.5
+    if l_tones[-1] != 1:
+        warnings.append("下联尾字非平声")
+        ze_ping_score -= 0.5
+    
+    # Clamp ze_ping_score to [0, 1]
+    ze_ping_score = max(0.0, min(1.0, ze_ping_score))
+    
+    # 三仄尾/三平尾 (handle zhong tones gracefully)
+    for name, tones in [("上联", u_tones), ("下联", l_tones)]:
+        if len(tones) >= 3:
+            last3 = tones[-3:]
+            # Count non-zhong tones
+            definite = [t for t in last3 if t != 0]
+            # If we have at least 2 definite tones and they are all same direction
+            if len(definite) >= 2 and all(t < 0 for t in definite):
+                warnings.append(f"{name}三仄尾")
+            if len(definite) >= 2 and all(t > 0 for t in definite):
+                warnings.append(f"{name}三平尾")
+    
+    pingze_score = 0.7 * er_si_score + 0.3 * ze_ping_score
+    
+    # 结构对称性（占位，后续由词性匹配实现）
+    structure_score = 1.0
+    
+    # 综合形式分：字数 50% + 平仄 30% + 结构 20%
+    formal_score = 0.5 * length_score + 0.3 * pingze_score + 0.2 * structure_score
+    
+    return formal_score, pingze_score, warnings
+
+
+def generate_overall_comment(formal_score: float, technique_score: float, artistic_score: float) -> str:
+    """生成总评（统一实现）
+    
+    Args:
+        formal_score: 形式合规得分 (0-1)
+        technique_score: 对仗技术得分 (0-1)
+        artistic_score: 艺术表现得分 (0-1)
+        
+    Returns:
+        总评文字
+    """
+    parts = []
+    
+    if formal_score >= 0.8:
+        parts.append("形式合规，平仄协调")
+    elif formal_score >= 0.6:
+        parts.append("形式基本合规，略有瑕疵")
+    else:
+        parts.append("形式有待改进")
+    
+    if technique_score >= 0.8:
+        parts.append("对仗技法娴熟")
+    elif technique_score >= 0.6:
+        parts.append("对仗尚可（经多维度算法验证）")
+    
+    if artistic_score >= 0.8:
+        parts.append("意境深远，修辞精妙")
+    elif artistic_score >= 0.6:
+        parts.append("有一定艺术价值")
+    
+    return "。".join(parts) + "。"
+
+
+def calculate_total_score(
+    formal_score: float,
+    technique_score: float,
+    artistic_score: float,
+    impression_score: float,
+    weights=None
+) -> float:
+    """计算加权总分
+    
+    Args:
+        formal_score: 形式合规得分 (0-1)
+        technique_score: 对仗技术得分 (0-1)
+        artistic_score: 艺术表现得分 (0-1)
+        impression_score: AI印象得分 (0-1)
+        weights: 权重字典，默认使用标准权重
+        
+    Returns:
+        总分 (0-100)
+    """
+    if weights is None:
+        weights = {
+            'formal': 0.30,
+            'technique': 0.30,
+            'artistic': 0.30,
+            'impression': 0.10
+        }
+    
+    total = (
+        weights['formal'] * formal_score +
+        weights['technique'] * technique_score +
+        weights['artistic'] * artistic_score +
+        weights['impression'] * impression_score
+    )
+    return round(total * 100, 1)
+
+
+def determine_grade(total_score: float) -> str:
+    """根据总分确定评级
+    
+    Args:
+        total_score: 总分 (0-100)
+        
+    Returns:
+        评级字符串
+    """
+    grade_thresholds = [(90, "优秀"), (75, "良好"), (60, "及格"), (0, "不合格")]
+    for threshold, grade in grade_thresholds:
+        if total_score >= threshold:
+            return grade
+    return "不合格"

@@ -1,14 +1,16 @@
-# PORM 企业级架构设计文档
+# OpenPROM 企业级架构设计文档
+
+> **注意**：v4.3.0 已迁移为纯 AI 应用层架构，移除了所有本地模型（BERT 等）。最新架构说明请以 `AGENTS.md` 为准。
 
 ## 1. 系统概述
 
 ### 1.1 项目定位
-PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联评分系统，采用字节跳动级工业标准设计，服务于对联创作、教学、比赛等专业场景。
+OpenPROM（Poetic Rhythm Master）是一款纯 AI 应用层中文诗词助手，基于 LLM + 轻量规则引擎，采用 Tool Calling + Agentic Loop 架构，提供对联评分、生成、补全与律诗生成、补全、格律检测六大能力。
 
 ### 1.2 核心特性
 - **四层评分架构**：形式合规(30%) + 对仗技术(30%) + 艺术表现(30%) + AI印象(10%)
 - **马鞍工程控制**：多层控制机制确保LLM输出可控、精确、可追溯
-- **NLP-LLM融合**：基于数学模型的深度融合算法，相互制约协同
+- **工具链式 Agent**：格律检测作为 LLM Tool，生成/补全必须通过格律检测才能交付
 - **提示词外部化**：完整的配置管理系统，支持动态更新
 
 ## 2. 架构设计
@@ -27,7 +29,7 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              应用层 (Application Layer)                       │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                     CoupletAnalyzer (对联分析器)                      │    │
+│  │               Couplet/Shi Service (对联/律诗服务)                     │    │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │    │
 │  │  │   形式分析   │  │   对仗分析   │  │   艺术分析   │  │   印象评分   │ │    │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘ │    │
@@ -47,7 +49,7 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    FusionEngine (融合引擎)                          │   │
+│  │              Tool Registry + Generation Agent                         │   │
 │  │  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐      │   │
 │  │  │ 特征提取层    │  │   融合计算层      │  │   决策输出层      │      │   │
 │  │  │FeatureExtractor│ │ WeightedAverage  │  │  FusionResult    │      │   │
@@ -67,7 +69,7 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              引擎层 (Engine Layer)                            │
 │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
-│  │   MeterEngine       │  │   PingZeEngine      │  │   EmbeddingEngine   │  │
+│  │   MeterEngine       │  │   PingZeEngine      │                     │  │
 │  │   (格律匹配引擎)     │  │   (平仄检测引擎)     │  │   (嵌入向量引擎)     │  │
 │  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -97,14 +99,14 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 
 #### 2.2.2 应用层 (Application Layer)
 - **职责**：编排领域服务，实现业务用例
-- **核心类**：`CoupletAnalyzer`
+- **核心服务**：`CoupletScorer`、`CoupletGenerator`、`ShiGenerator`
 - **功能**：协调各维度分析，汇总评分结果
 
 #### 2.2.3 领域层 (Domain Layer)
 - **职责**：核心业务逻辑，包含马鞍工程、融合引擎、LLM分析器
 - **核心组件**：
   - `SaddleEngineering`：多层控制机制
-  - `FusionEngine`：NLP-LLM融合
+  - `ToolRegistry`：LLM 可调用工具注册表
   - `LLMAnalyzer`：LLM深度分析
 
 #### 2.2.4 引擎层 (Engine Layer)
@@ -112,7 +114,7 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 - **组件**：
   - `MeterEngine`：诗律词谱匹配
   - `PingZeEngine`：平仄检测
-  - `EmbeddingEngine`：向量嵌入
+
 
 #### 2.2.5 基础设施层 (Infrastructure Layer)
 - **职责**：提供技术支持服务
@@ -166,7 +168,7 @@ PORM（Poetic Rhythm Master）是一款基于 NLP + LLM 的企业级中文对联
 | 输出层 | 确保输出准确 | 多源验证、自动修正 | 准确率>95% |
 | 决策层 | 确保决策合理 | 严格模式、完整记录 | 可追溯率100% |
 
-## 4. NLP-LLM融合引擎
+## 4. LLM Tool 调用循环
 
 ### 4.1 融合策略
 
@@ -195,7 +197,7 @@ P(Score|NLP,LLM) ∝ P(NLP|Score) × P(LLM|Score) × P(Score)
 ### 4.2 特征工程
 
 #### 4.2.1 语义特征
-- BERT嵌入向量余弦相似度
+- check_meter：格律检测 Tool
 - 逐字语义对齐分析
 - 上下文语义一致性
 
@@ -246,7 +248,7 @@ versions:
       required: [upper, lower]
       optional: [context, style]
     metadata:
-      author: porm-system
+      author: openprom-system
       created_at: "2024-01-01"
 ```
 
@@ -261,23 +263,16 @@ versions:
 ### 6.1 Python SDK
 
 ```python
-from porm import CoupletAnalyzer
-
-# 初始化
-analyzer = CoupletAnalyzer(
-    api_key="your-api-key",
-    base_url="https://api.example.com/v1",
-    model="gpt-4"
-)
+from openprom import score_couplet
 
 # 分析
-result = analyzer.analyze("春风化雨", "秋月寒霜")
+result = score_couplet("春风化雨", "秋月寒霜")
 
 # 结果
 print(result.total_score)      # 总分
 print(result.grade)            # 评级
 print(result.formal_score)     # 形式合规得分
-print(result.duizhang_score)   # 对仗技术得分
+print(result.technique_score)  # 对仗技术得分
 print(result.artistic_score)   # 艺术表现得分
 print(result.impression_score) # AI印象得分
 ```
@@ -286,17 +281,17 @@ print(result.impression_score) # AI印象得分
 
 ```bash
 # 对联评分
-python -m porm.main couplet "春风化雨" "秋月寒霜" \
+python -m openprom.main couplet "春风化雨" "秋月寒霜" \
     --api-key $API_KEY \
     --base-url $BASE_URL \
     --model gpt-4
 
 # 诗律检测
-python -m porm.main shi "白日依山尽" "黄河入海流" \
+python -m openprom.main shi "白日依山尽" "黄河入海流" \
     --pattern 五律
 
 # 列出可用模式
-python -m porm.main list shi
+python -m openprom.main list shi
 ```
 
 ## 7. 容错机制
@@ -327,35 +322,46 @@ python -m porm.main list shi
 ### 8.2 部署要求
 - Python 3.9+
 - 内存：4GB+
-- GPU：可选（BERT推理加速）
+- GPU：不需要（纯 API 调用）
 
 ## 9. 项目结构
 
 ```
-porm/
-├── porm/                          # 主包
+openprom/
+├── openprom/                          # 主包
 │   ├── __init__.py               # 包导出
-│   ├── main.py                   # CLI入口
+│   ├── api.py                    # REST API 服务
 │   ├── core/                     # 领域层
-│   │   ├── __init__.py
-│   │   ├── couplet.py            # 对联分析器
 │   │   ├── saddle_engineering.py # 马鞍工程
-│   │   └── fusion_engine.py      # 融合引擎
+│   │   └── base_analyzer.py      # 形式分析与共享工具
+│   ├── routers/                  # 接口路由层
+│   │   ├── couplet.py            # 对联路由
+│   │   ├── shi.py                # 律诗路由
+│   │   ├── meter.py              # 格律检测路由
+│   │   └── health.py             # 健康检查
+│   ├── services/                 # 应用服务层
+│   │   ├── llm_client.py         # 统一 LLM 客户端
+│   │   ├── meter_tool.py         # 格律检测 Tool
+│   │   ├── couplet_scorer.py     # 对联评分
+│   │   ├── couplet_generator.py  # 对联生成/补全
+│   │   └── shi_generator.py      # 律诗生成/补全
+│   ├── tools/                    # LLM Tool 层
+│   │   ├── schemas.py            # Tool Schema
+│   │   └── registry.py           # Tool 注册表
 │   ├── engines/                  # 引擎层
-│   │   ├── __init__.py
-│   │   ├── meter.py              # 格律匹配
-│   │   └── pingze.py             # 平仄检测
+│   │   ├── meter.py              # 格律匹配（线程安全）
+│   │   └── pingze.py             # 平仄检测（线程安全）
 │   ├── infrastructure/           # 基础设施层
-│   │   ├── __init__.py
-│   │   └── config/
-│   │       ├── __init__.py
-│   │       └── prompt_config.py  # 提示词配置
+│   │   ├── database.py           # 数据持久化
+│   │   ├── cache.py              # 缓存服务（TTL+LRU）
+│   │   ├── logging.py            # 结构化日志
+│   │   └── config/               # 配置管理
 │   └── data/                     # 数据层
-│       ├── __init__.py
-│       ├── loader.py             # 数据加载器
-│       ├── meters.json           # 诗体格律
-│       ├── ci-meters.json        # 词牌格律
-│       └── rhymebooks.json       # 韵书数据
+│       └── loader.py             # 数据加载器
+├── frontend/                     # 前端界面
+│   ├── index.html                # 主页面
+│   ├── styles.css                # 墨韵新中式样式
+│   └── app.js                    # 前端逻辑
 ├── config.json                   # 配置文件
 ├── pyproject.toml                # 项目配置
 └── ARCHITECTURE.md               # 架构文档
@@ -367,11 +373,11 @@ porm/
 |-----|------|-----|---------|
 | 核心语言 | Python | 3.9+ | 生态丰富，AI支持好 |
 | LLM客户端 | OpenAI SDK | 1.0+ | 标准接口，广泛兼容 |
-| NLP模型 | BERT | base-chinese | 中文理解能力强 |
+| 诗词规则 | 平水韵 + 诗律词谱 | - | 轻量规则引擎，作为 LLM Tool |
 | 配置管理 | YAML | - | 可读性好，支持注释 |
 | 模板引擎 | Jinja2 | 3.0+ | 功能强大，安全可靠 |
 | 数值计算 | NumPy | 1.24+ | 性能优异，生态成熟 |
 
 ## 11. 总结
 
-PORM系统采用企业级架构设计，通过马鞍工程实现LLM输出的精确控制，通过NLP-LLM融合实现多源信息的科学整合，通过提示词外部化实现配置的灵活管理。整个系统无退化方案、无简化逻辑，所有算法均基于严格的数学模型，确保评分的科学性、准确性和可追溯性。
+OpenPROM v4.3.0 采用纯 AI 应用层架构：通过 LLM Tool Calling 将格律检测融入生成/补全流程，通过马鞍工程实现 LLM 输出的质量控制，通过轻量规则引擎提供可解释的格律反馈。所有创意与评分工作由远程 LLM 完成，系统不加载任何本地大模型。

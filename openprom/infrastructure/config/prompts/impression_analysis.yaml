@@ -1,0 +1,22 @@
+name: impression_analysis
+prompt_type: IMPRESSION_ANALYSIS
+active_version: v1.0.0
+versions:
+  v1.0.0:
+    template: "请作为资深对联鉴赏家，凭专业直觉评价以下对联：\n\n上联：{{ upper }}\n下联：{{ lower }}\n\n评价要求：\n\
+      1. 忽略技术性细节（平仄、格律等），专注于整体审美体验\n2. 考虑第一印象的冲击力与持久力\n3. 评估艺术感染力与情感共鸣\n4. 判断是否具有收藏或传播价值\n\
+      \n评分标准：\n- 90-100分：惊艳之作，令人过目难忘\n- 80-89分：上乘之作，值得品味\n- 70-79分：良好之作，有一定价值\n- 60-69分：普通之作，缺乏亮点\n\
+      - 0-59分：欠佳之作，难以引起共鸣\n\n请以JSON格式返回：\n{\n    \"score\": 整数分数(0-100),\n    \"reason\"\
+      : \"评分理由（1-2句话概括核心感受）\",\n    \"highlights\": [\"亮点1\", \"亮点2\"],\n    \"weaknesses\"\
+      : [\"不足1\", \"不足2\"]\n}"
+    parameters:
+      required:
+      - upper
+      - lower
+    metadata:
+      author: openprom-system
+      created_at: '2024-01-01'
+      tags:
+      - impression
+      - score
+      - v1

@@ -1,4 +1,4 @@
-# PORM 部署指南
+# OpenPROM 部署指南
 
 版本：4.1.0  
 最后更新：2026 年 4 月
@@ -24,7 +24,7 @@
 
 ```bash
 git clone <repository-url>
-cd porm
+cd openprom
 ```
 
 ### 2. 设置环境变量
@@ -34,7 +34,7 @@ cd porm
 cp .env.example .env
 
 # 编辑 .env 文件，填入 API 密钥
-# PORM_API_KEY=your_api_key_here
+# OPENPROM_API_KEY=your_api_key_here
 ```
 
 ### 3. 安装依赖
@@ -46,17 +46,17 @@ pip install -r requirements.txt
 ### 4. 初始化数据库
 
 ```bash
-python -c "from porm.infrastructure.database import db_manager; db_manager.create_tables()"
+python -c "from openprom.infrastructure.database import db_manager; db_manager.create_tables()"
 ```
 
 ### 5. 启动服务
 
 ```bash
 # 开发模式
-python -m porm.api
+python -m openprom.api
 
 # 或使用 uvicorn
-uvicorn porm.api:app --host 0.0.0.0 --port 8000 --reload
+uvicorn openprom.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 6. 访问 API 文档
@@ -120,25 +120,25 @@ pip install -r requirements.txt
 
 ```bash
 # API 配置（必需）
-PORM_API_KEY=your_api_key_here
-PORM_BASE_URL=https://proxy.pieixan.icu/v1
-PORM_MODEL=Qwen3.5-9B-Instruct
+OPENPROM_API_KEY=your_api_key_here
+OPENPROM_BASE_URL=https://proxy.pieixan.icu/v1
+OPENPROM_MODEL=Qwen3.5-9B-Instruct
 
 # 服务配置（可选）
-PORM_HOST=0.0.0.0
-PORM_PORT=8000
-PORM_DEBUG=false
+OPENPROM_HOST=0.0.0.0
+OPENPROM_PORT=8000
+OPENPROM_DEBUG=false
 
 # 数据库配置（可选）
-PORM_DATABASE_URL=sqlite:///./porm.db
+OPENPROM_DATABASE_URL=sqlite:///./openprom.db
 
 # Redis 配置（可选）
-PORM_REDIS_URL=redis://localhost:6379/0
-PORM_CACHE_ENABLED=false
+OPENPROM_REDIS_URL=redis://localhost:6379/0
+OPENPROM_CACHE_ENABLED=false
 
 # 日志配置（可选）
-PORM_LOG_LEVEL=INFO
-PORM_LOG_FORMAT=text
+OPENPROM_LOG_LEVEL=INFO
+OPENPROM_LOG_FORMAT=text
 ```
 
 ### 4. 下载模型（可选）
@@ -158,7 +158,7 @@ AutoModel.from_pretrained('bert-base-chinese', cache_dir='./models')"
 ### 1. 构建镜像
 
 ```bash
-docker build -t porm:latest .
+docker build -t openprom:latest .
 ```
 
 ### 2. 使用 Docker Compose（推荐）
@@ -179,25 +179,25 @@ docker-compose down
 ```bash
 docker run -d \
   -p 8000:8000 \
-  -e PORM_API_KEY=your_api_key \
-  -e PORM_MODEL=Qwen3.5-9B-Instruct \
+  -e OPENPROM_API_KEY=your_api_key \
+  -e OPENPROM_MODEL=Qwen3.5-9B-Instruct \
   -v $(pwd)/data:/app/data \
-  --name porm-api \
-  porm:latest
+  --name openprom-api \
+  openprom:latest
 ```
 
 ### 4. Docker 环境变量
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `PORM_API_KEY` | API 密钥 | 无（必需） |
-| `PORM_BASE_URL` | API Base URL | `https://proxy.pieixan.icu/v1` |
-| `PORM_MODEL` | 模型名称 | `Qwen3.5-9B-Instruct` |
-| `PORM_DATABASE_URL` | 数据库 URL | `sqlite:///./data/porm.db` |
-| `PORM_REDIS_URL` | Redis URL | `redis://redis:6379/0` |
-| `PORM_CACHE_ENABLED` | 启用缓存 | `false` |
-| `PORM_LOG_LEVEL` | 日志级别 | `INFO` |
-| `PORM_LOG_FORMAT` | 日志格式 | `json` |
+| `OPENPROM_API_KEY` | API 密钥 | 无（必需） |
+| `OPENPROM_BASE_URL` | API Base URL | `https://proxy.pieixan.icu/v1` |
+| `OPENPROM_MODEL` | 模型名称 | `Qwen3.5-9B-Instruct` |
+| `OPENPROM_DATABASE_URL` | 数据库 URL | `sqlite:///./data/openprom.db` |
+| `OPENPROM_REDIS_URL` | Redis URL | `redis://redis:6379/0` |
+| `OPENPROM_CACHE_ENABLED` | 启用缓存 | `false` |
+| `OPENPROM_LOG_LEVEL` | 日志级别 | `INFO` |
+| `OPENPROM_LOG_FORMAT` | 日志格式 | `json` |
 
 ---
 
@@ -208,7 +208,7 @@ docker run -d \
 ```bash
 pip install gunicorn
 
-gunicorn porm.api:app \
+gunicorn openprom.api:app \
   -w 4 \
   -k uvicorn.workers.UvicornWorker \
   --bind 0.0.0.0:8000 \
@@ -222,7 +222,7 @@ gunicorn porm.api:app \
 ```nginx
 server {
     listen 80;
-    server_name porm.example.com;
+    server_name openprom.example.com;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -246,20 +246,20 @@ server {
 
 ### 3. Systemd 服务配置
 
-创建 `/etc/systemd/system/porm.service`：
+创建 `/etc/systemd/system/openprom.service`：
 
 ```ini
 [Unit]
-Description=PORM API Service
+Description=OpenPROM API Service
 After=network.target
 
 [Service]
 Type=notify
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/porm
-Environment="PATH=/opt/porm/venv/bin"
-ExecStart=/opt/porm/venv/bin/gunicorn porm.api:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+WorkingDirectory=/opt/openprom
+Environment="PATH=/opt/openprom/venv/bin"
+ExecStart=/opt/openprom/venv/bin/gunicorn openprom.api:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
 Restart=always
 RestartSec=10
 
@@ -271,9 +271,9 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable porm
-sudo systemctl start porm
-sudo systemctl status porm
+sudo systemctl enable openprom
+sudo systemctl start openprom
+sudo systemctl status openprom
 ```
 
 ---
@@ -378,10 +378,10 @@ Docker Compose 部署后，访问 http://localhost:3000
 
 ```bash
 # JSON 格式日志（生产环境）
-tail -f logs/porm.log | jq .
+tail -f logs/openprom.log | jq .
 
 # 文本格式日志（开发环境）
-tail -f logs/porm.log
+tail -f logs/openprom.log
 ```
 
 ### 4. 日志级别
@@ -405,10 +405,10 @@ tail -f logs/porm.log
 **解决**:
 ```bash
 # 检查环境变量
-echo $PORM_API_KEY
+echo $OPENPROM_API_KEY
 
 # 或检查 .env 文件
-cat .env | grep PORM_API_KEY
+cat .env | grep OPENPROM_API_KEY
 ```
 
 ### 2. 模型加载失败
@@ -450,8 +450,8 @@ redis-cli -h localhost ping
 # 生产环境建议使用 PostgreSQL
 
 # 临时解决：删除数据库文件重新创建
-rm porm.db
-python -c "from porm.infrastructure.database import db_manager; db_manager.create_tables()"
+rm openprom.db
+python -c "from openprom.infrastructure.database import db_manager; db_manager.create_tables()"
 ```
 
 ### 5. 内存不足
@@ -464,10 +464,10 @@ python -c "from porm.infrastructure.database import db_manager; db_manager.creat
 export CUDA_VISIBLE_DEVICES=0
 
 # 2. 减少并发
-export PORM_MAX_WORKERS=2
+export OPENPROM_MAX_WORKERS=2
 
 # 3. 使用更小的模型
-export PORM_MODEL=Qwen2.5-1.5B-Instruct
+export OPENPROM_MODEL=Qwen2.5-1.5B-Instruct
 
 # 4. 增加 swap 空间
 sudo fallocate -l 4G /swapfile
@@ -484,8 +484,8 @@ sudo swapon /swapfile
 
 ```bash
 # .env 文件
-PORM_CACHE_ENABLED=true
-PORM_REDIS_URL=redis://localhost:6379/0
+OPENPROM_CACHE_ENABLED=true
+OPENPROM_REDIS_URL=redis://localhost:6379/0
 ```
 
 ### 2. 使用 PostgreSQL
@@ -495,14 +495,14 @@ PORM_REDIS_URL=redis://localhost:6379/0
 pip install psycopg2-binary
 
 # .env 文件
-PORM_DATABASE_URL=postgresql://user:password@localhost:5432/porm
+OPENPROM_DATABASE_URL=postgresql://user:password@localhost:5432/openprom
 ```
 
 ### 3. 调整 Worker 数量
 
 ```bash
 # 根据 CPU 核心数调整
-gunicorn porm.api:app -w $(nproc) -k uvicorn.workers.UvicornWorker
+gunicorn openprom.api:app -w $(nproc) -k uvicorn.workers.UvicornWorker
 ```
 
 ### 4. 启用 HTTP/2
@@ -532,10 +532,10 @@ listen 443 ssl http2;
 4. **定期备份数据库**
    ```bash
    # SQLite 备份
-   cp porm.db porm.db.backup.$(date +%Y%m%d)
+   cp openprom.db openprom.db.backup.$(date +%Y%m%d)
    
    # PostgreSQL 备份
-   pg_dump porm > backup.sql
+   pg_dump openprom > backup.sql
    ```
 
 ---
@@ -543,5 +543,5 @@ listen 443 ssl http2;
 ## 支持
 
 - **GitHub Issues**: 提交 Bug 和功能请求
-- **邮件**: support@porm.local
+- **邮件**: support@openprom.local
 - **文档**: http://localhost:8000/docs

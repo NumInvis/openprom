@@ -1,0 +1,20 @@
+name: artistic_analysis
+prompt_type: ARTISTIC_ANALYSIS
+active_version: v1.0.0
+versions:
+  v1.0.0:
+    template: "请从艺术角度深度赏析以下对联：\n\n上联：{{ upper }}\n下联：{{ lower }}\n\n【意境营造】\n- 画面感：是否构建出清晰的视觉画面？\n\
+      - 情感：表达了怎样的情感基调？\n- 余味：读完后是否有回味的空间？\n\n【修辞手法】\n- 使用了哪些修辞手法？（比喻、拟人、夸张、对偶等）\n\
+      - 这些手法运用是否自然贴切？\n\n【文化内涵】\n- 是否有典故或文化引用？\n- 体现了怎样的文化底蕴？\n\n【创新性】\n- 意象组合是否有新意？\n\
+      - 是否突破了陈词滥调？\n\n请以JSON格式返回：\n{\n    \"score\": 整数分数(0-100),\n    \"意境\": {\"\
+      score\": 分数, \"comment\": \"结合原句分析意境\"},\n    \"修辞\": {\"score\": 分数, \"comment\"\
+      : \"结合原句分析修辞手法\"},\n    \"文化\": {\"score\": 分数, \"comment\": \"结合原句分析文化内涵\"\
+      },\n    \"创新\": {\"score\": 分数, \"comment\": \"结合原句分析创新性\"},\n    \"overall_comment\"\
+      : \"总体艺术评价\"\n}"
+    parameters:
+      required:
+      - upper
+      - lower
+    metadata:
+      author: openprom-system
+      created_at: '2024-01-01'

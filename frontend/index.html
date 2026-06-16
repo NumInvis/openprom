@@ -1,227 +1,221 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PORM - 对联评鉴系统</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenPROM · 诗词 AI 助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <div class="app">
-    <header class="header">
-      <div class="header-content">
-        <div class="logo">
-          <span class="logo-icon">🎋</span>
-          <h1 class="logo-title">PORM</h1>
-        </div>
-        <p class="tagline">对联自动评鉴系统</p>
+<div class="noise-overlay"></div>
+<div class="gradient-mesh">
+<div class="mesh-blob mesh-blob-1"></div>
+<div class="mesh-blob mesh-blob-2"></div>
+<div class="mesh-blob mesh-blob-3"></div>
+</div>
+<div class="app">
+<header class="header"><div class="header-content">
+<div class="logo"><span class="logo-seal">诗</span><div class="logo-text"><h1 class="logo-title">OpenPROM</h1><p class="logo-subtitle">诗词 AI 助手</p></div></div>
+<button class="theme-toggle" id="themeToggle" aria-label="切换主题"><span class="theme-icon light">☀</span><span class="theme-icon dark">☾</span></button>
+</div></header>
+<nav class="tab-nav" id="tabNav">
+  <button class="tab-button active" data-tab="score">对联评分</button>
+  <button class="tab-button" data-tab="generateCouplet">对联生成</button>
+  <button class="tab-button" data-tab="completeCouplet">对联补全</button>
+  <button class="tab-button" data-tab="generateShi">律诗生成</button>
+  <button class="tab-button" data-tab="completeShi">律诗补全</button>
+  <button class="tab-button" data-tab="meter">格律检测</button>
+</nav>
+<main class="main">
+<!-- 评分 Tab -->
+<section class="tab-panel active" id="panel-score">
+<section class="input-section" id="inputSection">
+<div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">开始评鉴</span><span class="eyebrow-line"></span></div>
+<div class="input-container glass-card">
+<div class="input-couplet-wrapper">
+<div class="input-group" data-position="upper">
+<label for="upper" class="input-label"><span class="label-tag">上联</span><span class="label-hint">出句</span></label>
+<div class="input-field-wrapper">
+<textarea id="upper" class="input-field" placeholder="请输入上联..." rows="2" maxlength="100"></textarea>
+<div class="input-meta"><span class="char-count" id="upperCount">0 字</span></div>
+</div></div>
+<div class="couplet-connector"><div class="connector-line"></div><div class="connector-ornament">◈</div><div class="connector-line"></div></div>
+<div class="input-group" data-position="lower">
+<label for="lower" class="input-label"><span class="label-tag">下联</span><span class="label-hint">对句</span></label>
+<div class="input-field-wrapper">
+<textarea id="lower" class="input-field" placeholder="请输入下联..." rows="2" maxlength="100"></textarea>
+<div class="input-meta"><span class="char-count" id="lowerCount">0 字</span><span class="match-indicator" id="matchIndicator"></span></div>
+</div></div>
+</div>
+<div class="input-actions">
+<button id="analyzeBtn" class="analyze-button"><span class="button-text">开始评鉴</span><span class="button-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></button>
+<button id="fillExampleBtn" class="text-button"><span>填入示例</span></button>
+</div></div>
+</section>
+<section id="loadingSection" class="loading-section hidden">
+<div class="loading-container glass-card">
+<div class="loading-visual"><div class="ink-loader"><div class="ink-drop"></div><div class="ink-ripple"></div><div class="ink-ripple ink-ripple-2"></div></div><p class="loading-title">正在评鉴</p><p class="loading-subtitle" id="loadingSubtitle">准备分析...</p></div>
+<div class="loading-progress"><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><div class="progress-steps">
+<div class="progress-step" data-step="formal"><div class="step-dot"></div><span class="step-name">形式</span></div>
+<div class="progress-step" data-step="technique"><div class="step-dot"></div><span class="step-name">技法</span></div>
+<div class="progress-step" data-step="artistic"><div class="step-dot"></div><span class="step-name">艺术</span></div>
+<div class="progress-step" data-step="fusion"><div class="step-dot"></div><span class="step-name">总评</span></div>
+</div></div>
+</div>
+</section>
+<section id="resultSection" class="result-section hidden">
+<div class="score-hero glass-card">
+<div class="score-main">
+<div class="score-circle"><svg class="score-svg" viewBox="0 0 140 140"><circle class="score-bg" cx="70" cy="70" r="62"/><circle class="score-progress" cx="70" cy="70" r="62"/></svg><div class="score-content"><span class="score-value" id="totalScore">0</span><span class="score-unit">分</span></div></div>
+<div class="score-badge-wrapper"><div class="grade-badge" id="gradeBadge">待评鉴</div><p class="score-summary" id="scoreSummary">——</p></div>
+</div>
+<div class="couplet-result" id="coupletResult">
+<div class="couplet-scroll">
+<div class="couplet-line upper"><span class="couplet-badge">上联</span><span class="couplet-text" id="resultUpper"></span></div>
+<div class="couplet-divider"></div>
+<div class="couplet-line lower"><span class="couplet-badge">下联</span><span class="couplet-text" id="resultLower"></span></div>
+</div></div>
+</div>
+<div class="dimensions-grid">
+<article class="dimension-card glass-card" data-dim="formal"><div class="dim-header"><div class="dim-icon">📐</div><div class="dim-info"><h3 class="dim-title">形式合规</h3><span class="dim-weight">30%</span></div><span class="dim-score" id="formalScore">0</span></div><div class="dim-bar"><div class="dim-bar-track"><div class="dim-bar-fill" id="formalBar"></div></div></div><div class="dim-detail"><span class="detail-label">平仄协调度</span><span class="detail-value" id="pingzeScore">0</span></div></article>
+<article class="dimension-card glass-card" data-dim="technique"><div class="dim-header"><div class="dim-icon">✍️</div><div class="dim-info"><h3 class="dim-title">对仗技术</h3><span class="dim-weight">30%</span></div><span class="dim-score" id="techniqueScore">0</span></div><div class="dim-bar"><div class="dim-bar-track"><div class="dim-bar-fill" id="techniqueBar"></div></div></div><div class="dim-detail"><span class="detail-label">语义匹配度</span><span class="detail-value" id="semanticScore">—</span></div></article>
+<article class="dimension-card glass-card" data-dim="artistic"><div class="dim-header"><div class="dim-icon">🎨</div><div class="dim-info"><h3 class="dim-title">艺术表现</h3><span class="dim-weight">30%</span></div><span class="dim-score" id="artisticScore">0</span></div><div class="dim-bar"><div class="dim-bar-track"><div class="dim-bar-fill" id="artisticBar"></div></div></div><div class="dim-detail"><span class="detail-label">修辞与意境</span><span class="detail-value">LLM分析</span></div></article>
+<article class="dimension-card glass-card" data-dim="impression"><div class="dim-header"><div class="dim-icon">💫</div><div class="dim-info"><h3 class="dim-title">AI 印象</h3><span class="dim-weight">10%</span></div><span class="dim-score" id="impressionScore">0</span></div><div class="dim-bar"><div class="dim-bar-track"><div class="dim-bar-fill" id="impressionBar"></div></div></div><div class="dim-detail"><span class="detail-label">整体印象</span><span class="detail-value">第一印象</span></div></article>
+</div>
+<div class="analysis-grid">
+<article class="analysis-card glass-card"><header class="analysis-header"><span class="analysis-icon">💬</span><h3 class="analysis-title">AI 印象</h3></header><div class="analysis-body"><p class="analysis-text" id="impressionReason">暂无印象</p></div></article>
+<article class="analysis-card glass-card"><header class="analysis-header"><span class="analysis-icon">📝</span><h3 class="analysis-title">技法点评</h3></header><div class="analysis-body"><p class="analysis-text" id="techniqueComment">暂无点评</p></div></article>
+<article class="analysis-card glass-card"><header class="analysis-header"><span class="analysis-icon">🎭</span><h3 class="analysis-title">艺术赏析</h3></header><div class="analysis-body"><p class="analysis-text" id="artisticComment">暂无赏析</p></div></article>
+<article class="analysis-card glass-card analysis-card--warning hidden" id="warningsCard"><header class="analysis-header"><span class="analysis-icon">⚠️</span><h3 class="analysis-title">注意事项</h3></header><div class="analysis-body"><ul class="warnings-list" id="warningsList"></ul></div></article>
+</div>
+<article class="analysis-card glass-card hidden" id="wordAnalysisCard">
+<header class="analysis-header"><span class="analysis-icon">🔍</span><h3 class="analysis-title">逐字剖析</h3></header>
+<div class="analysis-body"><div class="word-analysis-panel" id="wordAnalysisPanel"></div></div>
+</article>
+<div class="result-actions">
+<button class="action-button action-button--secondary" id="newAnalysisBtn"><span>新的评鉴</span></button>
+<button class="action-button" id="shareBtn"><span>分享结果</span></button>
+<button class="action-button action-button--ghost" id="saveBtn"><span>保存记录</span></button>
+</div>
+</section>
+<section class="history-section" id="historySection">
+<div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">评鉴历史</span><span class="eyebrow-line"></span></div>
+<div class="history-container glass-card">
+<div class="history-header"><h2 class="history-title">近期评鉴</h2><button class="text-button text-button--small" id="clearHistoryBtn">清空</button></div>
+<div class="history-list" id="historyList">
+<div class="history-empty" id="historyEmpty"><div class="empty-icon">📜</div><p>暂无评鉴记录</p><p class="empty-hint">评鉴结果将自动保存在这里</p></div>
+</div></div>
+</section>
+</section>
+
+<!-- 生成/补全 通用模板 -->
+<section class="tab-panel" id="panel-generateCouplet">
+  <div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">对联生成</span><span class="eyebrow-line"></span></div>
+  <div class="gen-container glass-card" data-mode="generate" data-type="couplet">
+    <div class="gen-inputs">
+      <label class="input-label"><span class="label-tag">主题</span></label>
+      <textarea class="input-field gen-prompt" placeholder="输入主题，例如：春天、山水、励志..." rows="2"></textarea>
+      <div class="gen-options">
+        <label>字数：<select class="gen-length"><option value="5">五言</option><option value="7" selected>七言</option></select></label>
       </div>
-    </header>
-
-    <main class="main">
-      <section class="input-section">
-        <div class="input-container">
-          <div class="input-group">
-            <label for="upper" class="input-label">
-              <span class="label-icon">上</span>
-              <span class="label-text">上联</span>
-            </label>
-            <textarea 
-              id="upper" 
-              class="input-field" 
-              placeholder="请输入上联..."
-              rows="2"
-            ></textarea>
-          </div>
-
-          <div class="input-group">
-            <label for="lower" class="input-label">
-              <span class="label-icon">下</span>
-              <span class="label-text">下联</span>
-            </label>
-            <textarea 
-              id="lower" 
-              class="input-field" 
-              placeholder="请输入下联..."
-              rows="2"
-            ></textarea>
-          </div>
-
-          <button id="analyzeBtn" class="analyze-button">
-            <span class="button-text">开始评鉴</span>
-            <span class="button-icon">→</span>
-          </button>
-        </div>
-      </section>
-
-      <section id="loadingSection" class="loading-section hidden">
-        <div class="loading-container">
-          <div class="loading-spinner"></div>
-          <p class="loading-text">正在评鉴中...</p>
-          <div class="loading-steps">
-            <div class="loading-step" data-step="formal">
-              <span class="step-icon">📐</span>
-              <span class="step-text">形式检测</span>
-            </div>
-            <div class="loading-step" data-step="technique">
-              <span class="step-icon">✍️</span>
-              <span class="step-text">技法分析</span>
-            </div>
-            <div class="loading-step" data-step="artistic">
-              <span class="step-icon">🎨</span>
-              <span class="step-text">艺术评鉴</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="resultSection" class="result-section hidden">
-        <div class="result-header">
-          <div class="score-circle">
-            <svg class="score-svg" viewBox="0 0 120 120">
-              <circle class="score-bg" cx="60" cy="60" r="54"/>
-              <circle class="score-progress" cx="60" cy="60" r="54"/>
-            </svg>
-            <div class="score-content">
-              <span class="score-value" id="totalScore">0</span>
-              <span class="score-label">总分</span>
-            </div>
-          </div>
-          <div class="grade-badge" id="gradeBadge">待评鉴</div>
-        </div>
-
-        <div class="couplet-display">
-          <div class="couplet-line upper">
-            <span class="couplet-label">上联</span>
-            <span class="couplet-text" id="resultUpper"></span>
-          </div>
-          <div class="couplet-line lower">
-            <span class="couplet-label">下联</span>
-            <span class="couplet-text" id="resultLower"></span>
-          </div>
-        </div>
-
-        <div class="scores-grid">
-          <div class="score-card">
-            <div class="score-card-header">
-              <span class="score-card-icon">📐</span>
-              <span class="score-card-title">形式合规</span>
-              <span class="score-card-weight">30%</span>
-            </div>
-            <div class="score-card-body">
-              <div class="score-bar">
-                <div class="score-bar-fill" id="formalBar"></div>
-              </div>
-              <span class="score-card-value" id="formalScore">0</span>
-            </div>
-            <div class="score-card-detail">
-              <span class="detail-label">平仄:</span>
-              <span class="detail-value" id="pingzeScore">0</span>
-            </div>
-          </div>
-
-          <div class="score-card">
-            <div class="score-card-header">
-              <span class="score-card-icon">✍️</span>
-              <span class="score-card-title">对仗技术</span>
-              <span class="score-card-weight">30%</span>
-            </div>
-            <div class="score-card-body">
-              <div class="score-bar">
-                <div class="score-bar-fill" id="techniqueBar"></div>
-              </div>
-              <span class="score-card-value" id="techniqueScore">0</span>
-            </div>
-          </div>
-
-          <div class="score-card">
-            <div class="score-card-header">
-              <span class="score-card-icon">🎨</span>
-              <span class="score-card-title">艺术表现</span>
-              <span class="score-card-weight">30%</span>
-            </div>
-            <div class="score-card-body">
-              <div class="score-bar">
-                <div class="score-bar-fill" id="artisticBar"></div>
-              </div>
-              <span class="score-card-value" id="artisticScore">0</span>
-            </div>
-          </div>
-
-          <div class="score-card">
-            <div class="score-card-header">
-              <span class="score-card-icon">💫</span>
-              <span class="score-card-title">AI 印象</span>
-              <span class="score-card-weight">10%</span>
-            </div>
-            <div class="score-card-body">
-              <div class="score-bar">
-                <div class="score-bar-fill" id="impressionBar"></div>
-              </div>
-              <span class="score-card-value" id="impressionScore">0</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="analysis-section">
-          <div class="analysis-card">
-            <h3 class="analysis-title">
-              <span class="title-icon">💬</span>
-              AI 印象
-            </h3>
-            <p class="analysis-content" id="impressionReason"></p>
-          </div>
-
-          <div class="analysis-card">
-            <h3 class="analysis-title">
-              <span class="title-icon">📝</span>
-              技法点评
-            </h3>
-            <p class="analysis-content" id="techniqueComment"></p>
-          </div>
-
-          <div class="analysis-card">
-            <h3 class="analysis-title">
-              <span class="title-icon">🎭</span>
-              艺术赏析
-            </h3>
-            <p class="analysis-content" id="artisticComment"></p>
-          </div>
-
-          <div class="analysis-card" id="warningsCard">
-            <h3 class="analysis-title">
-              <span class="title-icon">⚠️</span>
-              注意事项
-            </h3>
-            <ul class="warnings-list" id="warningsList"></ul>
-          </div>
-        </div>
-
-        <div class="action-buttons">
-          <button class="action-button secondary" id="newAnalysisBtn">
-            <span class="button-icon">↻</span>
-            <span class="button-text">新的评鉴</span>
-          </button>
-          <button class="action-button" id="shareBtn">
-            <span class="button-icon">📤</span>
-            <span class="button-text">分享结果</span>
-          </button>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <p class="footer-text">
-        PORM v4.1.0 · 基于 NLP+LLM 的企业级评分引擎
-      </p>
-    </footer>
+      <button class="analyze-button gen-run"><span class="button-text">生成对联</span></button>
+    </div>
+    <div class="gen-output hidden">
+      <div class="gen-output-header">结果</div>
+      <pre class="gen-output-content"></pre>
+      <div class="gen-output-log hidden"></div>
+    </div>
   </div>
+</section>
 
-  <div id="toast" class="toast hidden"></div>
+<section class="tab-panel" id="panel-completeCouplet">
+  <div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">对联补全</span><span class="eyebrow-line"></span></div>
+  <div class="gen-container glass-card" data-mode="complete" data-type="couplet">
+    <div class="gen-inputs">
+      <label class="input-label"><span class="label-tag">上联或部分对联</span></label>
+      <textarea class="input-field gen-prompt" placeholder="输入上联，AI 将补全下联..." rows="2"></textarea>
+      <div class="gen-options">
+        <label>字数：<select class="gen-length"><option value="5">五言</option><option value="7" selected>七言</option></select></label>
+      </div>
+      <button class="analyze-button gen-run"><span class="button-text">补全对联</span></button>
+    </div>
+    <div class="gen-output hidden">
+      <div class="gen-output-header">结果</div>
+      <pre class="gen-output-content"></pre>
+      <div class="gen-output-log hidden"></div>
+    </div>
+  </div>
+</section>
 
-  <script src="app.js"></script>
+<section class="tab-panel" id="panel-generateShi">
+  <div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">律诗生成</span><span class="eyebrow-line"></span></div>
+  <div class="gen-container glass-card" data-mode="generate" data-type="shi">
+    <div class="gen-inputs">
+      <label class="input-label"><span class="label-tag">主题</span></label>
+      <textarea class="input-field gen-prompt" placeholder="输入主题，例如：登高、秋思、送别..." rows="2"></textarea>
+      <div class="gen-options">
+        <label>体裁：<select class="gen-form"><option value="五绝">五绝</option><option value="七绝">七绝</option><option value="五律">五律</option><option value="七律" selected>七律</option></select></label>
+        <label>平仄：<select class="gen-tone"><option value="">自动</option><option value="平起">平起</option><option value="仄起">仄起</option></select></label>
+      </div>
+      <button class="analyze-button gen-run"><span class="button-text">生成律诗</span></button>
+    </div>
+    <div class="gen-output hidden">
+      <div class="gen-output-header">结果</div>
+      <pre class="gen-output-content"></pre>
+      <div class="gen-output-log hidden"></div>
+    </div>
+  </div>
+</section>
+
+<section class="tab-panel" id="panel-completeShi">
+  <div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">律诗补全</span><span class="eyebrow-line"></span></div>
+  <div class="gen-container glass-card" data-mode="complete" data-type="shi">
+    <div class="gen-inputs">
+      <label class="input-label"><span class="label-tag">已写诗句</span></label>
+      <textarea class="input-field gen-prompt" placeholder="输入已写出的诗句（每句一行），AI 将续成一首..." rows="5"></textarea>
+      <div class="gen-options">
+        <label>体裁：<select class="gen-form"><option value="五绝">五绝</option><option value="七绝">七绝</option><option value="五律">五律</option><option value="七律" selected>七律</option></select></label>
+        <label>平仄：<select class="gen-tone"><option value="">自动</option><option value="平起">平起</option><option value="仄起">仄起</option></select></label>
+      </div>
+      <button class="analyze-button gen-run"><span class="button-text">补全律诗</span></button>
+    </div>
+    <div class="gen-output hidden">
+      <div class="gen-output-header">结果</div>
+      <pre class="gen-output-content"></pre>
+      <div class="gen-output-log hidden"></div>
+    </div>
+  </div>
+</section>
+
+<section class="tab-panel" id="panel-meter">
+  <div class="section-eyebrow"><span class="eyebrow-line"></span><span class="eyebrow-text">格律检测</span><span class="eyebrow-line"></span></div>
+  <div class="gen-container glass-card">
+    <div class="gen-inputs">
+      <label class="input-label"><span class="label-tag">文本</span></label>
+      <textarea id="meterText" class="input-field" placeholder="输入诗词文本：对联上下联用换行分隔；律诗每句一行。" rows="6"></textarea>
+      <div class="gen-options">
+        <label>类型：<select id="meterType"><option value="shi">诗/律诗/绝句</option><option value="ci">词牌</option><option value="couplet">对联</option></select></label>
+        <label>指定格律：<input id="meterPattern" type="text" placeholder="可选，如：七律平起首句入韵" style="width:160px"></label>
+      </div>
+      <button id="meterBtn" class="analyze-button"><span class="button-text">检测格律</span></button>
+    </div>
+    <div id="meterOutput" class="gen-output hidden">
+      <div class="gen-output-header">检测结果</div>
+      <pre id="meterOutputContent" class="gen-output-content"></pre>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="footer">
+<div class="footer-content">
+<div class="footer-brand"><span class="footer-seal">诗</span><span class="footer-name">OpenPROM</span></div>
+<div class="footer-links"><a href="/docs" target="_blank">API 文档</a><span class="footer-divider">·</span><a href="/health" target="_blank">服务状态</a></div>
+<p class="footer-version">v4.3.0 · 纯 AI 应用层诗词助手</p>
+</div>
+</footer>
+</div>
+<div id="toast" class="toast"><span class="toast-icon" id="toastIcon"></span><span class="toast-message" id="toastMessage"></span></div>
+<script src="/static/app.js"></script>
 </body>
 </html>

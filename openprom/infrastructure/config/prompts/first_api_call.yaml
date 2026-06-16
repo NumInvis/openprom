@@ -1,0 +1,14 @@
+name: first_api_call
+prompt_type: IMPRESSION_ANALYSIS
+active_version: v2.0.0
+versions:
+  v2.0.0:
+    template: "你是一位资深对联鉴赏专家，请对以下对联进行第一印象快速评估。\n\n上联：{{ upper }}\n下联：{{ lower }}\n\n【评估任务】\n请从以下三个维度进行评估：\n\n1️⃣ **第一印象得分**（0-100整数）\n   基于你的专业直觉，给出整体印象分数。\n   参考标准：\n   - 95-100: 绝世佳作，完美无瑕\n   - 85-94: 上乘之作，技艺精湛\n   - 75-84: 优良作品，略有瑕疵\n   - 65-74: 中等水平，尚可接受\n   - 50-64: 较差作品，问题明显\n   - 0-49: 不合格\n\n2️⃣ **第一印象理由**（详细文本）\n   说明你给出该分数的主要原因，包括：\n   - 直观感受\n   - 明显优点或缺点\n   - 初步判断的问题点\n\n3️⃣ **特别注意事项** ⭐（关键输出）\n   这是给后续深度分析的指导意见！\n   请指出：\n   - 这副对联最值得深入分析的技法特点是什么？\n   - 有哪些容易被忽视的精妙之处？\n   - 存在哪些需要重点检查的潜在问题？\n   - 从技法角度，建议后续分析重点关注哪些方面？\n   - 是否有特殊的修辞手法或文化内涵？\n\n【重要提示】\n- \"特别注意\"部分要具体、有针对性，不要泛泛而谈\n- 要结合这副对联的具体特点给出建议\n- 后续分析会基于你的\"特别注意\"进行更深入的技法评判\n\n请以JSON格式返回：\n{\n    \"first_impression_score\": 整数分数(0-100),\n    \"first_impression_reason\": \"详细的印象评估理由\",\n    \"special_attention\": {\n        \"key_technique\": \"最突出的技法特点\",\n        \"hidden_highlights\": \"容易被忽略的精妙之处\",\n        \"potential_issues\": \"需要重点检查的潜在问题\",\n        \"analysis_focus\": \"建议后续分析的重点方向\",\n        \"rhetoric_notes\": \"特殊修辞手法或文化内涵说明\",\n        \"guidance_for_deep_analysis\": \"给第二次深度分析的具体指导建议\"\n    }\n}"
+    parameters:
+      required:
+      - upper
+      - lower
+    metadata:
+      author: openprom-system
+      created_at: '2024-01-01'
+      description: 第一次API调用 - 获取第一印象和特别注意事项

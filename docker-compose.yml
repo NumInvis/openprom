@@ -6,14 +6,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - PORM_API_KEY=${PORM_API_KEY:-}
-      - PORM_BASE_URL=${PORM_BASE_URL:-https://proxy.pieixan.icu/v1}
-      - PORM_MODEL=${PORM_MODEL:-Qwen3.5-9B-Instruct}
-      - PORM_DATABASE_URL=sqlite:///./data/porm.db
-      - PORM_REDIS_URL=redis://redis:6379/0
-      - PORM_CACHE_ENABLED=${PORM_CACHE_ENABLED:-false}
-      - PORM_LOG_LEVEL=${PORM_LOG_LEVEL:-INFO}
-      - PORM_LOG_FORMAT=${PORM_LOG_FORMAT:-json}
+      - OPENPROM_API_KEY=${OPENPROM_API_KEY:-}
+      - OPENPROM_BASE_URL=${OPENPROM_BASE_URL:-https://proxy.pieixan.icu/v1}
+      - OPENPROM_MODEL=${OPENPROM_MODEL:-Qwen3.5-9B-Instruct}
+      - OPENPROM_DATABASE_URL=sqlite:///./data/openprom.db
+      - OPENPROM_REDIS_URL=redis://redis:6379/0
+      - OPENPROM_CACHE_ENABLED=${OPENPROM_CACHE_ENABLED:-false}
+      - OPENPROM_LOG_LEVEL=${OPENPROM_LOG_LEVEL:-INFO}
+      - OPENPROM_LOG_FORMAT=${OPENPROM_LOG_FORMAT:-json}
     volumes:
       - ./data:/app/data
       - ./models:/app/models:ro

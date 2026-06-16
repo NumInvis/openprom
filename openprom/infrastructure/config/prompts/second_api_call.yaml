@@ -1,0 +1,15 @@
+name: second_api_call
+prompt_type: TECHNIQUE_ANALYSIS
+active_version: v4.0.0
+versions:
+  v4.0.0:
+    template: "你是一位精通对联技法的专家。请基于以下信息对联进行评价。\n\n📝 **对联**\n上联：{{ upper }}\n下联：{{ lower }}\n\n🎯 **关键洞察**（来自初步分析）\n{{ key_insights }}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**任务1：技法评分**（0-100分）\n重点分析：\n- 词性对应是否工整\n- 句式结构是否平行\n- 平仄格律是否协调\n- 对仗类型判定（正对/反对/流水对）\n\n**任务2：修辞评分**（0-100分）\n识别并评价：\n- 使用了哪些修辞手法\n- 意境营造效果\n- 语言艺术性\n\n以JSON返回：\n{\n    \"technique_score\": 技法分数,\n    \"rhetoric_score\": 修辞分数,\n    \"technique_comment\": \"技法综合评价（结合原句）\",\n    \"rhetoric_comment\": \"修辞与艺术评价（结合原句）\"\n}"
+    parameters:
+      required:
+      - upper
+      - lower
+      - key_insights
+    metadata:
+      author: openprom-system
+      version: "4.0"
+      description: "第二次API调用 - 纯LLM技法分析（v4: 移除BERT依赖）"

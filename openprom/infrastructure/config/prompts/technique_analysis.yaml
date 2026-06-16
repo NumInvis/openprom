@@ -1,0 +1,20 @@
+name: technique_analysis
+prompt_type: TECHNIQUE_ANALYSIS
+active_version: v1.0.0
+versions:
+  v1.0.0:
+    template: "请从技法角度分析以下对联：\n\n上联：{{ upper }}\n下联：{{ lower }}\n\n逐字逐词分析：\n1. 【词性对应】：分析每个对应位置的词性是否匹配（名对名、动对动等）\n\
+      2. 【结构对应】：分析句式结构是否平行（主谓对主谓、偏正对偏正等）\n3. 【平仄对应】：分析平仄是否相对\n4. 【对仗类型】：判断是正对、反对还是流水对\n\
+      \n评分标准：\n- 90-100分：对仗工整，词性、结构、平仄均协调\n- 80-89分：对仗良好，略有瑕疵\n- 70-79分：对仗及格，存在明显问题\n\
+      - 60-69分：对仗较差\n- 0-59分：不符合对仗要求\n\n请以JSON格式返回：\n{\n    \"score\": 整数分数(0-100),\n\
+      \    \"reason\": \"逐字技法分析，指出每个对应位置的对仗情况\",\n    \"word_analysis\": [\n     \
+      \   {\"pos\": 1, \"upper_char\": \"字\", \"lower_char\": \"字\", \"pos_match\"\
+      : true/false, \"comment\": \"评价\"}\n    ],\n    \"structure\": \"结构分析\",\n \
+      \   \"duizhang_type\": \"正对/反对/流水对\"\n}"
+    parameters:
+      required:
+      - upper
+      - lower
+    metadata:
+      author: openprom-system
+      created_at: '2024-01-01'

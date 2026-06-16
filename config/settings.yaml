@@ -1,6 +1,6 @@
-# PORM 系统配置文件
-# 版本：4.2.0
-# 更新日期：2026-04-24
+# OpenPROM 系统配置文件
+# 版本：4.3.0
+# 更新日期：2026-06-15
 
 # ====================
 # API 配置
@@ -13,6 +13,7 @@ api:
   temperature_technique: 0.3
   temperature_artistic: 0.4
   temperature_impression: 0.4
+  temperature_generation: 0.7
   
   max_workers: 4
   first_api_timeout: 300
@@ -39,12 +40,78 @@ scoring:
     fail: 0
 
 # ====================
+# 工具链 / Agent 配置
+# ====================
+tools:
+  meter:
+    match_rate_threshold: 0.85
+    strict_match_rate_threshold: 0.95
+  rhyme:
+    book: 平水韵
+    max_suggestions: 8
+    # 常用韵字优先级（出现频率高）
+    common_chars_weight: 1.2
+
+generation:
+  couplet:
+    max_revision_rounds: 3
+    default_length: 7
+  shi:
+    max_revision_rounds: 4
+    default_form: 七律
+    supported_forms: [五绝, 七绝, 五律, 七律]
+  streaming:
+    enabled: true
+    keep_alive_comment: true
+
+agent:
+  # 当 LLM 生成未通过格律检测时，是否将 tool_result 回送以触发自修正
+  enable_self_revision: true
+  # 无法自动修正时是否交付“最佳尝试”
+  deliver_best_effort: true
+
+# ====================
+# RAG / 知识向量层（Hermes-style memory layer）
+# ====================
+rag:
+  enabled: true
+  embedding_provider: sentence_transformers
+  embedding_model: BAAI/bge-small-zh-v1.5
+  embedding_device: cpu
+  vector_store_dir: openprom/data/vector_store
+  vector_store_collection: poetry_knowledge
+  # 生成时检索多少首古人诗作作为参考
+  retrieve_top_k: 3
+  # 是否按体裁过滤（五律/七律/五绝/七绝）
+  filter_by_form: true
+  # 知识库为空时的行为：true=继续生成并提示用户；false=报错
+  allow_empty_store: true
+
+# ====================
+# Hermes 检索与技能层
+# ====================
+hermes:
+  enabled: true
+  top_k: 3
+  # 是否启用向量 + 关键词混合检索
+  enable_hybrid: true
+  # RRF 融合权重
+  vector_weight: 1.0
+  keyword_weight: 1.0
+  rrf_k: 60
+  # 索引时分块策略
+  chunk_whole_poem: true
+  chunk_couplets: true
+  chunk_quatrains: true
+
+# ====================
 # 特性开关
 # ====================
 features:
   saddle_engineering:
     enabled: true
     strict_mode: false
+    max_violations: 3
   verbose_analysis:
     enabled: true
     max_char_display: 10

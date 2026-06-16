@@ -1,4 +1,4 @@
-# PORM 项目系统性优化实施报告
+# OpenPROM 项目系统性优化实施报告
 
 **版本**: 3.1.0 (Optimized)  
 **日期**: 2026-04-02  
@@ -16,7 +16,7 @@
 **修复**: 改用句子级[CLS] token编码
 
 **修改文件**:
-- [fusion_engine.py](porm/core/fusion_engine.py)
+- [fusion_engine.py](openprom/core/fusion_engine.py)
   - 新增 `_get_sentence_embedding()` 方法
   - 新增 `_get_char_embedding()` 方法（仅用于展示）
   - 重构 `extract_semantic_features()` 使用[CLS]编码
@@ -44,11 +44,11 @@ emb = _get_sentence_embedding(text)  # ✅ [CLS]保留完整上下文
 **修复**: 基于实际数据分布的Z-score + Sigmoid归一化
 
 **修改文件**:
-- [fusion_engine.py](porm/core/fusion_engine.py)
+- [fusion_engine.py](openprom/core/fusion_engine.py)
   - 添加 `_normalization_params` 配置
   - 实现 `_normalize_bert_score()` 方法
   
-- [dual_api_scorer.py](porm/core/dual_api_scorer.py)
+- [dual_api_scorer.py](openprom/core/dual_api_scorer.py)
   - 使用 `normalized_similarity` 而非手动计算
 
 **数学公式**:
@@ -74,7 +74,7 @@ emb = _get_sentence_embedding(text)  # ✅ [CLS]保留完整上下文
 **修复**: 添加上下文管理器支持
 
 **修改文件**:
-- [dual_api_scorer.py](porm/core/dual_api_scorer.py)
+- [dual_api_scorer.py](openprom/core/dual_api_scorer.py)
   - 实现 `__enter__()` 和 `__exit__()`
   - 新增 `shutdown()` 显式清理方法
   - 添加 `_is_shutdown` 状态标记
@@ -104,7 +104,7 @@ result = analyze_dual_api(upper, lower, api_key, base_url, model)
 #### ✅ 统一分析器接口
 
 **新增文件**:
-- [analyzer_interface.py](porm/core/analyzer_interface.py)
+- [analyzer_interface.py](openprom/core/analyzer_interface.py)
   - 定义 `CoupletAnalyzerInterface` 抽象基类
   - 定义 `AnalysisResult` 统一数据结构
   - 实现 `DualAPIAnalyzerAdapter` 适配器
@@ -121,7 +121,7 @@ result = analyze_dual_api(upper, lower, api_key, base_url, model)
 ```
 
 **修改文件**:
-- [tui.py](porm/ui/tui.py)
+- [tui.py](openprom/ui/tui.py)
   - 更新 `launch_tui()` 使用统一接口
   - 保持向后兼容
 
@@ -140,7 +140,7 @@ result = analyze_dual_api(upper, lower, api_key, base_url, model)
   - 性能优化配置
   - 特性开关
 
-- [infrastructure/config/settings.py](porm/infrastructure/config/settings.py)
+- [infrastructure/config/settings.py](openprom/infrastructure/config/settings.py)
   - `Settings` 全局配置单例
   - 类型安全的配置数据类
   - 支持环境变量覆盖
@@ -188,7 +188,7 @@ bert:
 - Token消耗: ~3500 tokens → **~800 tokens** (减少75%+)
 
 **新增文件**:
-- [second_api_call_v3.yaml](porm/infrastructure/config/prompts/second_api_call_v3.yaml)
+- [second_api_call_v3.yaml](openprom/infrastructure/config/prompts/second_api_call_v3.yaml)
   - 精简版提示词模板
   - 仅要求核心评分，不要求详细JSON
 
@@ -214,10 +214,10 @@ bert:
 
 | 文件路径 | 用途 | 行数 |
 |----------|------|------|
-| `porm/core/analyzer_interface.py` | 统一分析器接口 | ~150 |
+| `openprom/core/analyzer_interface.py` | 统一分析器接口 | ~150 |
 | `config/settings.yaml` | 系统配置文件 | ~150 |
-| `porm/infrastructure/config/settings.py` | 配置加载器 | ~250 |
-| `porm/infrastructure/config/prompts/second_api_call_v3.yaml` | 精简版提示词 | ~35 |
+| `openprom/infrastructure/config/settings.py` | 配置加载器 | ~250 |
+| `openprom/infrastructure/config/prompts/second_api_call_v3.yaml` | 精简版提示词 | ~35 |
 
 **总计新增**: ~585行代码
 
@@ -225,9 +225,9 @@ bert:
 
 | 文件路径 | 主要改动 | 改动量 |
 |----------|----------|--------|
-| `porm/core/fusion_engine.py` | BERT算法重构 | +120行 |
-| `porm/core/dual_api_scorer.py` | 资源管理+提示词优化 | +80行 |
-| `porm/ui/tui.py` | 接口适配 | +30行 |
+| `openprom/core/fusion_engine.py` | BERT算法重构 | +120行 |
+| `openprom/core/dual_api_scorer.py` | 资源管理+提示词优化 | +80行 |
+| `openprom/ui/tui.py` | 接口适配 | +30行 |
 | `test_dual_api.py` | 展示优化效果 | +15行 |
 
 **总计修改**: ~245行

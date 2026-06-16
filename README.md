@@ -1,7 +1,8 @@
-# PORM - 对联自动评分系统
+# OpenPROM - 诗词 AI 助手
 
-版本：4.1.0  
-模型：Qwen3.5-9B-Instruct  
+版本：4.3.0  
+模型：qwen3.7-plus  
+LLM 端点：`https://wincode.winning.com.cn/ai/v1`  
 许可证：MIT
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,19 +13,23 @@
 
 ## 简介
 
-PORM 是基于 **NLP + LLM** 的企业级中文对联评分系统，采用字节跳动级工业标准设计。
+OpenPROM 是基于 **LLM + 规则引擎** 的纯 AI 应用层中文诗词助手，采用工具链（Tool Calling）+ Agentic Loop 架构。
 
 ### 核心特性
 
+- ✅ **六大能力**: 对联评分、对联生成、对联补全、律诗生成、律诗补全、格律检测
+- ✅ **工具链式 Agent**: 格律检测作为 LLM Tool，生成/补全必须通过格律检测才能交付
+- ✅ **自动韵字提示**: 当格律无法自行修正时，主动提供同韵部候选字给 LLM
 - ✅ **四层评分架构**: 形式合规 (30%) + 对仗技术 (30%) + 艺术表现 (30%) + AI 印象 (10%)
 - ✅ **双 API 评分系统**: 第一印象评估 + 深度技法分析
-- ✅ **BERT 语义相似度**: 句子级 [CLS] 编码，精准计算语义相似性
 - ✅ **马鞍工程控制**: 输入层 + 过程层 + 输出层 + 决策层全方位质量控制
 - ✅ **REST API 服务**: FastAPI 驱动，支持流式输出 (SSE)
 - ✅ **数据持久化**: SQLite/PostgreSQL 支持，历史记录可追溯
 - ✅ **Redis 缓存**: 智能缓存层，支持内存降级
 - ✅ **可观测性**: Prometheus 监控 + 结构化日志
 - ✅ **Docker 部署**: 一键启动，包含完整监控栈
+- ✅ **主题切换**: 暗色/亮色模式
+- ✅ **评鉴历史**: 本地存储历史记录
 
 ---
 
@@ -33,8 +38,8 @@ PORM 是基于 **NLP + LLM** 的企业级中文对联评分系统，采用字节
 ### 1. 安装
 
 ```bash
-git clone https://github.com/yourusername/porm.git
-cd porm
+git clone https://github.com/yourusername/openprom.git
+cd openprom
 pip install -r requirements.txt
 ```
 
@@ -42,14 +47,14 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# 编辑 .env 填入 PORM_API_KEY
+# 编辑 .env 填入 OPENPROM_API_KEY
 ```
 
 ### 3. 启动服务
 
 ```bash
 # 方式 1: Web 界面 + API 服务 (推荐)
-python -m porm.api
+python -m openprom.api
 
 # 方式 2: Docker Compose (推荐)
 docker-compose up -d
@@ -75,10 +80,12 @@ CLI 和 TUI 模式已弃用，请迁移到 Web 界面使用。
 启动服务后，打开浏览器访问 **http://localhost:8000**
 
 Web 界面提供:
-- ✨ 现代化的视觉设计
-- 📊 直观的分数展示
+- ✨ 墨韵新中式视觉设计（书法字体 + 宣纸纹理）
+- 📊 直观的分数展示（动画圆环 + 维度卡片）
 - 💬 详细的评鉴分析
 - 📤 一键分享结果
+- 🌓 暗色/亮色主题切换
+- 📜 评鉴历史记录
 
 ### 🔌 REST API
 
@@ -109,7 +116,7 @@ curl -X POST "http://localhost:8000/api/v1/meter/check" \
 ### Python SDK
 
 ```python
-from porm import CoupletAnalyzer
+from openprom import CoupletAnalyzer
 
 analyzer = CoupletAnalyzer(
     api_key="your-api-key",
@@ -138,14 +145,14 @@ print(f"评语：{result.comments}")
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `PORM_API_KEY` | API 密钥 | 必需 |
-| `PORM_BASE_URL` | API Base URL | `https://proxy.pieixan.icu/v1` |
-| `PORM_MODEL` | 模型名称 | `Qwen3.5-9B-Instruct` |
-| `PORM_DATABASE_URL` | 数据库 URL | `sqlite:///./porm.db` |
-| `PORM_REDIS_URL` | Redis URL | `redis://localhost:6379/0` |
-| `PORM_CACHE_ENABLED` | 启用缓存 | `false` |
-| `PORM_LOG_LEVEL` | 日志级别 | `INFO` |
-| `PORM_LOG_FORMAT` | 日志格式 | `text` |
+| `OPENPROM_API_KEY` | API 密钥 | 必需 |
+| `OPENPROM_BASE_URL` | API Base URL | `https://wincode.winning.com.cn/ai/v1/chat` |
+| `OPENPROM_MODEL` | 模型名称 | `qwen3.7-plus` |
+| `OPENPROM_DATABASE_URL` | 数据库 URL | `sqlite:///./openprom.db` |
+| `OPENPROM_REDIS_URL` | Redis URL | `redis://localhost:6379/0` |
+| `OPENPROM_CACHE_ENABLED` | 启用缓存 | `false` |
+| `OPENPROM_LOG_LEVEL` | 日志级别 | `INFO` |
+| `OPENPROM_LOG_FORMAT` | 日志格式 | `text` |
 
 ### config/settings.yaml
 
@@ -176,8 +183,14 @@ scoring:
 | `/` | GET | API 根路径 |
 | `/health` | GET | 健康检查 |
 | `/api/v1/couplet/analyze` | POST | 对联评分 |
+| `/api/v1/couplet/generate` | POST | 对联生成（SSE） |
+| `/api/v1/couplet/complete` | POST | 对联补全（SSE） |
+| `/api/v1/shi/generate` | POST | 律诗生成（SSE） |
+| `/api/v1/shi/complete` | POST | 律诗补全（SSE） |
 | `/api/v1/meter/check` | POST | 格律检测 |
 | `/api/v1/meters/list` | GET | 列出格律模板 |
+| `/api/v1/couplet/history` | GET | 评鉴历史记录 |
+| `/api/v1/couplet/statistics` | GET | 评鉴统计信息 |
 | `/metrics` | GET | Prometheus 指标 |
 | `/docs` | GET | OpenAPI 文档 |
 
@@ -188,7 +201,7 @@ scoring:
 | 维度 | 权重 | 说明 |
 |------|------|------|
 | 形式合规 | 30% | 平仄、字数、格律检测 |
-| 对仗技术 | 30% | NLP 语义分析 + LLM 辅助判断 |
+| 对仗技术 | 30% | LLM 技法与修辞分析 |
 | 艺术表现 | 30% | LLM 深度文学分析 |
 | AI 印象 | 10% | AI 整体印象评分 |
 
@@ -206,7 +219,7 @@ scoring:
 ## 架构设计
 
 ```
-porm/
+openprom/
 ├── api.py                    # REST API 服务
 ├── main.py                   # CLI 入口
 ├── core/                     # 领域层
@@ -278,7 +291,7 @@ docker-compose up -d
 {
   "timestamp": "2026-04-24T12:00:00Z",
   "level": "INFO",
-  "logger": "porm.api",
+  "logger": "openprom.api",
   "message": "对联评分 | 上联=春风送暖... | 分数=87.5",
   "extra": {
     "total_score": 87.5,
@@ -307,8 +320,8 @@ pytest tests/
 ### 代码检查
 
 ```bash
-ruff check porm/
-black --check porm/
+ruff check openprom/
+black --check openprom/
 ```
 
 ---
@@ -317,10 +330,10 @@ black --check porm/
 
 ### API 密钥错误
 
-确保已设置 `PORM_API_KEY` 环境变量：
+确保已设置 `OPENPROM_API_KEY` 环境变量：
 
 ```bash
-export PORM_API_KEY=your_api_key
+export OPENPROM_API_KEY=your_api_key
 ```
 
 ### 模型加载失败
@@ -342,6 +355,27 @@ docker-compose ps redis
 ---
 
 ## 变更日志
+
+### v4.2.0 (2026-04-24)
+
+**前端重构**:
+- 全新墨韵新中式设计（书法字体 + 宣纸纹理 + 渐变网格）
+- 暗色/亮色主题切换
+- 历史记录本地存储
+- 字数实时匹配提示
+- 墨水加载动画
+- 响应式多断点适配
+
+**后端优化**:
+- 评分器请求级复用（延迟降低 50%+）
+- FusionEngine 线程安全模型加载
+- [CLS] token 语义特征提取
+- jieba 分词句法分析（优雅降级）
+- 高斯贝叶斯融合算法
+- 缓存 TTL + LRU 淘汰策略
+- MeterEngine 线程安全 + PING/PING_REQUIRED 区分
+- 三仄尾/三平尾检查算法修正
+- 新增历史记录/统计 API 端点
 
 ### v4.1.0 (2026-04-24)
 
