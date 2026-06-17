@@ -18,7 +18,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from openprom import __version__
-from openprom.routers import meter_router, couplet_router, shi_router, health_router
+from openprom.routers import (
+    meter_router,
+    couplet_router,
+    shi_router,
+    health_router,
+    knowledge_router,
+    tasks_router,
+)
 from openprom.infrastructure.database import get_db_manager
 from openprom.infrastructure.logging import get_logger
 from openprom.utils.env_config import (
@@ -91,6 +98,8 @@ def create_app() -> FastAPI:
     app.include_router(meter_router)
     app.include_router(couplet_router)
     app.include_router(shi_router)
+    app.include_router(knowledge_router)
+    app.include_router(tasks_router)
 
     if PROMETHEUS_AVAILABLE:
         @app.get("/metrics")

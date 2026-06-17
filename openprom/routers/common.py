@@ -132,3 +132,100 @@ def get_llm_client_instance(request: Request):
     """Dependency: obtain the global LLM client."""
     from openprom.services.llm_client import get_llm_client
     return get_llm_client()
+
+
+# ---------------------------------------------------------------------------
+# Knowledge layer / Tasks layer models (M3)
+# ---------------------------------------------------------------------------
+
+
+class KnowledgeSearchRequest(BaseModel):
+    """Knowledge layer retrieval request."""
+    query: str = Field(..., description="检索查询", min_length=1, max_length=500)
+    top_k: int = Field(default=5, description="返回结果数", ge=1, le=50)
+    task_type: Optional[str] = Field(
+        default=None,
+        description="任务类型：generate_couplet/generate_shi/analyze_couplet/check_meter/general",
+    )
+    target_form: Optional[str] = Field(
+        default=None,
+        description="目标体裁，用于规则信号融合（如 wu jue/qi lv）",
+    )
+    filters: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="ChromaDB metadata 过滤条件",
+    )
+
+
+class KnowledgeSearchHit(BaseModel):
+    """Single retrieval hit."""
+    id: str
+    content: str
+    annotated: str
+    chunk_type: str
+    final_score: float
+    semantic_score: float
+    rerank_score: Optional[float] = None
+    rule_signals: Dict[str, float] = Field(default_factory=dict)
+    provenance: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeSearchResponse(BaseModel):
+    """Knowledge layer retrieval response."""
+    query: str
+    total_candidates: int
+    pipeline_stages: List[str]
+    results: List[KnowledgeSearchHit]
+    latency_ms: float
+
+
+class KnowledgeStatsResponse(BaseModel):
+    """Knowledge layer statistics."""
+    enabled: bool
+    knowledge_layer_v2: bool
+    vector_store_size: int
+    retrieval_cache: Dict[str, Any]
+    rerank_cache: Dict[str, Any]
+    embedding_provider: str
+    rerank_provider: str
+    skills: List[str]
+
+
+class TaskListResponse(BaseModel):
+    """Registered task list."""
+    tasks: List[Dict[str, Any]]
+
+
+class TraceListItem(BaseModel):
+    """Trace summary for the list endpoint."""
+    task_id: str
+    task_name: str
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    total_duration_ms: float
+    llm_calls: int
+    tool_calls: int
+    rag_calls: int
+    success: bool
+    error: Optional[str] = None
+
+
+class TraceDetailResponse(TraceListItem):
+    """Full trace including step list."""
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class TaskRunRequest(BaseModel):
+    """Run an arbitrary registered task via AgentRunner."""
+    task_name: str = Field(..., description="任务名（必须已在 TaskRegistry 中注册）")
+    user_prompt: str = Field(..., description="用户输入", min_length=1, max_length=2000)
+    system_prompt: Optional[str] = Field(default=None, description="覆盖任务默认 system prompt")
+    max_rounds: Optional[int] = Field(default=None, description="覆盖任务的最大 LLM 轮数", ge=1, le=10)
+    extra_context: Optional[str] = Field(default=None, description="附加上下文（例如已检索到的范例）")
+
+
+class TaskRunResponse(BaseModel):
+    """Result of running a task via AgentRunner."""
+    content: str
+    trace: TraceDetailResponse

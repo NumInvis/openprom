@@ -103,6 +103,62 @@ class HermesConfig:
     chunk_quatrains: bool = True
 
 
+@dataclass
+class KnowledgeRetrievalConfig:
+    """Knowledge layer retrieval sub-config."""
+    strategy: str = "hybrid"
+    top_k_recall: int = 20
+    top_k_final: int = 5
+    rerank_enabled: bool = False
+    rerank_provider: str = "noop"
+    rerank_weight_semantic: float = 0.6
+    rerank_weight_rule: float = 0.4
+    fusion_method: str = "rrf"
+    rrf_k: int = 60
+
+
+@dataclass
+class KnowledgeEmbeddingConfig:
+    """Knowledge layer embedding sub-config."""
+    provider: str = "sentence_transformers"
+    model: str = "BAAI/bge-small-zh-v1.5"
+    device: str = "cpu"
+
+
+@dataclass
+class KnowledgeMemoryConfig:
+    """Knowledge layer memory sub-config."""
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 3600
+    min_score: int = 75
+
+
+@dataclass
+class KnowledgeCorpusConfig:
+    """Knowledge layer corpus sub-config."""
+    active_snapshot: str = ""
+    fallback_on_empty: bool = True
+
+
+@dataclass
+class KnowledgeConfig:
+    """Knowledge layer v2 config (Hermes upgrade)."""
+    enabled: bool = False
+    retrieval: KnowledgeRetrievalConfig = field(default_factory=KnowledgeRetrievalConfig)
+    embedding: KnowledgeEmbeddingConfig = field(default_factory=KnowledgeEmbeddingConfig)
+    memory: KnowledgeMemoryConfig = field(default_factory=KnowledgeMemoryConfig)
+    corpus: KnowledgeCorpusConfig = field(default_factory=KnowledgeCorpusConfig)
+
+
+@dataclass
+class FeaturesConfig:
+    """Feature flags."""
+    knowledge_layer_v2: bool = False
+    saddle_engineering_enabled: bool = True
+    saddle_strict_mode: bool = False
+    saddle_max_violations: int = 3
+
+
 class Settings:
     """配置管理器"""
 
@@ -155,6 +211,8 @@ class Settings:
         self.agent = self._parse_agent_config()
         self.rag = self._parse_rag_config()
         self.hermes = self._parse_hermes_config()
+        self.knowledge = self._parse_knowledge_config()
+        self.features = self._parse_features_config()
 
     def _parse_api_config(self) -> APIConfig:
         api_dict = self._raw_config.get('api', {})
@@ -258,6 +316,54 @@ class Settings:
             chunk_whole_poem=h_dict.get('chunk_whole_poem', True),
             chunk_couplets=h_dict.get('chunk_couplets', True),
             chunk_quatrains=h_dict.get('chunk_quatrains', True),
+        )
+
+    def _parse_knowledge_config(self) -> KnowledgeConfig:
+        k_dict = self._raw_config.get('knowledge', {})
+        ret_dict = k_dict.get('retrieval', {})
+        rerank_dict = ret_dict.get('rerank', {})
+        weights_dict = rerank_dict.get('weights', {})
+        fusion_dict = ret_dict.get('fusion', {})
+        emb_dict = k_dict.get('embedding', {})
+        mem_dict = k_dict.get('memory', {})
+        corp_dict = k_dict.get('corpus', {})
+        return KnowledgeConfig(
+            enabled=k_dict.get('enabled', False),
+            retrieval=KnowledgeRetrievalConfig(
+                strategy=ret_dict.get('strategy', 'hybrid'),
+                top_k_recall=ret_dict.get('top_k_recall', 20),
+                top_k_final=ret_dict.get('top_k_final', 5),
+                rerank_enabled=rerank_dict.get('enabled', False),
+                rerank_provider=rerank_dict.get('provider', 'noop'),
+                rerank_weight_semantic=weights_dict.get('semantic', 0.6),
+                rerank_weight_rule=weights_dict.get('rule', 0.4),
+                fusion_method=fusion_dict.get('method', 'rrf'),
+                rrf_k=fusion_dict.get('rrf_k', 60),
+            ),
+            embedding=KnowledgeEmbeddingConfig(
+                provider=emb_dict.get('provider', 'sentence_transformers'),
+                model=emb_dict.get('model', 'BAAI/bge-small-zh-v1.5'),
+                device=emb_dict.get('device', 'cpu'),
+            ),
+            memory=KnowledgeMemoryConfig(
+                cache_enabled=mem_dict.get('cache_enabled', True),
+                cache_ttl_seconds=mem_dict.get('cache_ttl_seconds', 3600),
+                min_score=mem_dict.get('min_score', 75),
+            ),
+            corpus=KnowledgeCorpusConfig(
+                active_snapshot=corp_dict.get('active_snapshot', ''),
+                fallback_on_empty=corp_dict.get('fallback_on_empty', True),
+            ),
+        )
+
+    def _parse_features_config(self) -> FeaturesConfig:
+        feat = self._raw_config.get('features', {})
+        saddle = feat.get('saddle_engineering', {})
+        return FeaturesConfig(
+            knowledge_layer_v2=feat.get('knowledge_layer_v2', False),
+            saddle_engineering_enabled=saddle.get('enabled', True),
+            saddle_strict_mode=saddle.get('strict_mode', False),
+            saddle_max_violations=saddle.get('max_violations', 3),
         )
 
     def reload(self):

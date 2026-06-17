@@ -92,6 +92,29 @@ class RhymeBook:
             return []
         return list(self._data.keys())
 
+    def get_rhyme_category(self, char: str, book: str = "平水韵") -> Optional[str]:
+        """查询汉字在指定韵书中的韵部名称
+
+        Args:
+            char: 待查询的汉字
+            book: 韵书名称，默认"平水韵"
+
+        Returns:
+            韵部名称（每组首字），None=未找到
+        """
+        if self._data is None or book not in self._data:
+            return None
+
+        book_data = self._data[book]
+        if not isinstance(book_data, list) or len(book_data) < 2:
+            return None
+
+        for category_group in book_data[0] + book_data[1]:
+            if char in category_group:
+                return category_group[0]
+
+        return None
+
     def get_book_info(self, book: str) -> Optional[Dict]:
         """获取韵书信息"""
         if self._data is None or book not in self._data:

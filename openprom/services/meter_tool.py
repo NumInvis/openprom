@@ -90,6 +90,8 @@ def check_meter(text: str, meter_type: str, pattern_name: Optional[str] = None, 
     """Main tool entrypoint: check meter for shi/ci/couplet.
 
     Returns a dict suitable for both HTTP API and LLM tool_result.
+    When ``is_compliant`` is False, the ``fixes`` field contains actionable
+    suggestions the LLM can use to precisely correct violations.
     """
     settings = get_settings()
     threshold = settings.tools.meter_strict_match_rate_threshold if strict else settings.tools.meter_match_rate_threshold
@@ -105,6 +107,7 @@ def check_meter(text: str, meter_type: str, pattern_name: Optional[str] = None, 
         "rhyme_suggestions": [],
         "is_compliant": False,
         "tone_details": [],
+        "fixes": [],
     }
 
     if meter_type == "couplet":
@@ -115,9 +118,10 @@ def check_meter(text: str, meter_type: str, pattern_name: Optional[str] = None, 
         result["is_compliant"] = is_compliant
         result["violations"] = violations
         result["tone_details"] = details
-        # If last char of lower is wrong, offer rhyme candidates
-        if lower and not is_compliant and any("下联尾字" in v for v in violations):
-            result["rhyme_suggestions"] = get_rhyme_candidates(lower[-1], tone="ping", count=settings.tools.rhyme_max_suggestions)
+        if not is_compliant:
+            result["fixes"] = _build_couplet_fixes(upper, lower, details)
+            if any("下联尾字" in v for v in violations):
+                result["rhyme_suggestions"] = get_rhyme_candidates(lower[-1], tone="ping", count=settings.tools.rhyme_max_suggestions)
         return result
 
     # shi or ci
@@ -144,24 +148,94 @@ def check_meter(text: str, meter_type: str, pattern_name: Optional[str] = None, 
     if best:
         result["is_compliant"] = best.is_valid
         result["violations"] = [
-            f"{err.get('line', 0)+1}行第{err.get('pos', 0)+1}字“{err.get('char')}”当{err.get('expected')}而{err.get('actual')}"
+            f"{err.get('line', 0)+1}行第{err.get('pos', 0)+1}字\u201c{err.get('char')}\u201d当{err.get('expected')}而{err.get('actual')}"
             for err in best.errors
         ]
-        # Build pingze sequence for all lines
         result["pingze_sequence"] = [get_sequence(line) for line in lines]
 
-        # Rhyme hints: if last character of the last line violates ping, suggest candidates
-        if not best.is_valid and lines:
+        if not best.is_valid:
+            result["fixes"] = _build_shi_fixes(best.errors, lines, settings)
             last_line = lines[-1]
             last_char = last_line[-1] if last_line else ""
             for err in best.errors:
-                if err.get("line") == len(lines) - 1 and err.get("pos") == len(last_line) - 1 and err.get("expected") == "平":
+                if err.get("line") == len(lines) - 1 and err.get("pos") == len(last_line) - 1 and err.get("expected") == "\u5e73":
                     result["rhyme_suggestions"] = get_rhyme_candidates(last_char, tone="ping", count=settings.tools.rhyme_max_suggestions)
                     break
     else:
         result["violations"].append("未找到可匹配的格律模板")
 
     return result
+
+
+def _build_couplet_fixes(upper: str, lower: str, details: List[Dict]) -> List[Dict[str, Any]]:
+    """Build actionable fix suggestions for couplet violations."""
+    fixes = []
+    tone_map = {1: "\u5e73", -1: "\u4e36", 0: "\u53ef\u5e73\u53ef\u4e36"}
+    for d in details:
+        pos = d.get("pos", 0)
+        rule = d.get("rule", "")
+        fix: Dict[str, Any] = {"line": 0, "position": pos + 1}
+
+        if "\u4e8c\u56db\u516d\u5206\u660e" in rule:
+            fix["line"] = "\u4e0a\u8054+\u4e0b\u8054"
+            fix["current_chars"] = f"{d.get('upper_char','')}/{d.get('lower_char','')}"
+            fix["current_tones"] = f"{tone_map.get(d.get('upper_tone',0),'?')}/{tone_map.get(d.get('lower_tone',0),'?')}"
+            fix["needed"] = "\u4e0a\u4e0b\u8054\u8be5\u4f4d\u7f6e\u5e73\u4e36\u76f8\u53cd"
+            fix["description"] = (
+                f"\u7b2c{pos+1}\u5b57\u4e0a\u4e0b\u8054\u5e73\u4e36\u5e94\u76f8\u53cd\uff1a"
+                f"\u4e0a\u8054\u201c{d.get('upper_char','')}\u201d({tone_map.get(d.get('upper_tone',0),'?')}) "
+                f"\u5bf9 \u4e0b\u8054\u201c{d.get('lower_char','')}\u201d({tone_map.get(d.get('lower_tone',0),'?')})"
+            )
+        elif "\u4e0a\u8054\u5c3e\u5b57" in rule:
+            fix["line"] = "\u4e0a\u8054"
+            fix["current_char"] = d.get("char", "")
+            fix["current_tone"] = tone_map.get(d.get("tone", 0), "?")
+            fix["needed"] = "\u4e36\u58f0"
+            fix["description"] = f"\u4e0a\u8054\u5c3e\u5b57\u201c{d.get('char','')}\u201d\u5e94\u4e3a\u4e36\u58f0"
+            fix["rhyme_candidates"] = get_rhyme_candidates(d.get("char", ""), tone="ze", count=8)
+        elif "\u4e0b\u8054\u5c3e\u5b57" in rule:
+            fix["line"] = "\u4e0b\u8054"
+            fix["current_char"] = d.get("char", "")
+            fix["current_tone"] = tone_map.get(d.get("tone", 0), "?")
+            fix["needed"] = "\u5e73\u58f0"
+            fix["description"] = f"\u4e0b\u8054\u5c3e\u5b57\u201c{d.get('char','')}\u201d\u5e94\u4e3a\u5e73\u58f0"
+            fix["rhyme_candidates"] = get_rhyme_candidates(d.get("char", ""), tone="ping", count=8)
+        else:
+            fix["description"] = str(rule)
+
+        fixes.append(fix)
+    return fixes
+
+
+def _build_shi_fixes(errors: List[Dict], lines: List[str], settings) -> List[Dict[str, Any]]:
+    """Build actionable fix suggestions for shi/ci violations."""
+    fixes = []
+    for err in errors:
+        line_idx = err.get("line", 0)
+        pos = err.get("pos", 0)
+        char = err.get("char", "")
+        expected = err.get("expected", "")
+        actual = err.get("actual", "")
+
+        line_text = lines[line_idx] if line_idx < len(lines) else ""
+        fix: Dict[str, Any] = {
+            "line": line_idx + 1,
+            "position": pos + 1,
+            "current_char": char,
+            "current_tone": actual,
+            "needed_tone": expected,
+            "description": (
+                f"\u7b2c{line_idx+1}\u53e5\u7b2c{pos+1}\u5b57\u201c{char}\u201d\u662f"
+                f"{actual}\u58f0\uff0c\u5e94\u6539\u4e3a{expected}\u58f0"
+            ),
+        }
+
+        if pos == len(line_text) - 1:
+            tone = "ping" if expected == "\u5e73" else "ze"
+            fix["rhyme_candidates"] = get_rhyme_candidates(char, tone=tone, count=settings.tools.rhyme_max_suggestions)
+
+        fixes.append(fix)
+    return fixes
 
 
 def get_rhyme_candidates(char: str, tone: Optional[str] = None, count: int = 8) -> List[str]:

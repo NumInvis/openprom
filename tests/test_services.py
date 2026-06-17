@@ -34,12 +34,15 @@ def test_explain_rule():
     assert "平仄" in text
 
 
-def test_generator_build_prompt():
-    # Validate that prompts can be built without API call
-    from openprom.services.couplet_generator import _build_prompt
-    prompt = _build_prompt("generate", "春天", length=7)
-    assert "春天" in prompt
-    assert "7" in prompt
+def test_generator_meter_context():
+    # Validate that meter context can be retrieved without API call
+    from openprom.services.couplet_generator import _get_meter_context
+    ctx = _get_meter_context(7)
+    assert len(ctx) > 0  # Should return pattern strings
+
+    from openprom.services.shi_generator import _get_meter_context as shi_ctx
+    ctx2 = shi_ctx("七律")
+    assert len(ctx2) > 0
 
 
 def test_shi_generator_resolve_form():

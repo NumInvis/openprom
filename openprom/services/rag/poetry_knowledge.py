@@ -8,16 +8,17 @@ adapter over openprom.services.hermes for backward compatibility.
 import logging
 from typing import Any, Dict, List, Optional
 
-from openprom.services.hermes.retriever import HermesRetriever, get_hermes_retriever
-
 logger = logging.getLogger(__name__)
 
 
 class PoetryKnowledge:
     """Retrieval-augmented poetry knowledge."""
 
-    def __init__(self, retriever: Optional[HermesRetriever] = None):
-        self.retriever = retriever or get_hermes_retriever()
+    def __init__(self, retriever=None):
+        if retriever is None:
+            from openprom.services.hermes.retriever import get_hermes_retriever
+            retriever = get_hermes_retriever()
+        self.retriever = retriever
 
     def retrieve_examples(
         self,

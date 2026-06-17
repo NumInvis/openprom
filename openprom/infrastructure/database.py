@@ -202,6 +202,11 @@ class DatabaseManager:
     def create_tables(self):
         """创建所有表"""
         logger.info("创建数据库表...")
+        # Import side-effect: register TaskTraceRow with Base before metadata.create_all
+        try:
+            from openprom.infrastructure import task_trace  # noqa: F401
+        except Exception:
+            pass
         Base.metadata.create_all(bind=self.engine)
         logger.info("数据库表创建完成")
     

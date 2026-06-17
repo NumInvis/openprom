@@ -2,9 +2,15 @@
 
 Replaces the previous DualAPITechniqueScorer. It relies entirely on the
 configured LLM plus rule-based formal analysis; no local models are loaded.
+
+Every ``analyze`` call is instrumented with a ``TaskTrace`` that records
+formal analysis, both LLM calls, Saddle QC, and the final score, so scoring
+flows are observable in the same trace store as generation flows.
 """
 
 import logging
+import time
+import uuid
 from typing import Any, Dict, List
 from dataclasses import dataclass, field
 
@@ -96,24 +102,51 @@ class CoupletScorer:
             }
 
     def analyze(self, upper: str, lower: str) -> CoupletScore:
-        """Run the full scoring pipeline."""
+        """Run the full scoring pipeline.
+
+        A ``TaskTrace`` is created and persisted so every scoring call is
+        observable in the trace store alongside generation traces.
+        """
+        from openprom.agents import TaskTrace
+
+        trace = TaskTrace(
+            task_name="analyze_couplet",
+            task_id=f"s-{uuid.uuid4().hex[:12]}",
+            started_at=time.time(),
+        )
+
         result = CoupletScore(upper=upper, lower=lower)
 
         formal_score, pingze_score, warnings = analyze_formal(upper, lower)
         result.formal_score = formal_score
         result.pingze_score = pingze_score
         result.warnings = warnings
+        trace.add_step("formal_analysis", {
+            "formal_score": formal_score,
+            "pingze_score": pingze_score,
+            "warnings_count": len(warnings),
+        })
 
         if len(upper) != len(lower):
             result.grade = "不合格"
             result.total_score = 0.0
             result.comments = {"overall_comment": "上下联字数不等，无法评分。"}
+            trace.success = False
+            trace.error = "length_mismatch"
+            trace.finished_at = time.time()
+            self._persist_trace(trace)
             return result
 
         first = self._first_call(upper, lower)
         result.first_impression_score = normalize_score(first.get("first_impression_score", 0), max_score=100)
         result.first_impression_reason = first.get("first_impression_reason", "")
         result.special_attention = first.get("special_attention", {})
+        trace.add_step("llm_call", {
+            "round": 1,
+            "label": "first_impression",
+            "fallback": first.get("fallback", False),
+            "score": result.first_impression_score,
+        })
 
         second = self._second_call(upper, lower, result.special_attention)
         result.llm_technique_score = normalize_score(second.get("technique_score", 0), max_score=100)
@@ -121,6 +154,13 @@ class CoupletScorer:
         result.llm_rhetoric_score = normalize_score(second.get("rhetoric_score", 0), max_score=100)
         result.llm_rhetoric_evaluation = second.get("rhetoric_evaluation", {})
         result.word_analysis = second.get("word_analysis", [])
+        trace.add_step("llm_call", {
+            "round": 2,
+            "label": "technique_rhetoric",
+            "fallback": second.get("fallback", False),
+            "technique_score": result.llm_technique_score,
+            "rhetoric_score": result.llm_rhetoric_score,
+        })
 
         # Saddle engineering quality control
         nlp_features = {
@@ -128,6 +168,7 @@ class CoupletScorer:
             "pingze_score": pingze_score,
         }
         meter_analysis = {"is_valid": len(warnings) == 0, "warnings": warnings}
+        saddle_t0 = time.time()
         saddle_ctx = self._saddle.execute(
             upper=upper,
             lower=lower,
@@ -136,6 +177,10 @@ class CoupletScorer:
             llm_parsed_result=second,
             meter_analysis=meter_analysis,
         )
+        trace.add_step("saddle_check", {
+            "applied": saddle_ctx.final_score != result.llm_technique_score * 100,
+            "violations": len(saddle_ctx.validation_results),
+        }, duration_ms=(time.time() - saddle_t0) * 1000)
 
         corrected_llm_score = saddle_ctx.llm_parsed_result.get("score", result.llm_technique_score)
         result.saddle_applied = saddle_ctx.final_score != result.llm_technique_score * 100
@@ -171,8 +216,48 @@ class CoupletScorer:
             ),
         }
 
+        trace.add_step("result", {
+            "total_score": result.total_score,
+            "grade": result.grade,
+            "saddle_applied": result.saddle_applied,
+        })
+        trace.success = True
+        trace.finished_at = time.time()
+        self._persist_trace(trace)
+
         logger.info(f"Couplet scored | total={result.total_score} | grade={result.grade} | saddle={result.saddle_applied}")
+
+        # Wire feedback ingestion: high-scoring couplets → knowledge base
+        self._try_feedback_ingest(upper, lower, result.total_score)
+
         return result
+
+    @staticmethod
+    def _persist_trace(trace) -> None:
+        """Best-effort trace persistence."""
+        try:
+            from openprom.infrastructure.task_trace import get_task_trace_store
+            get_task_trace_store().save(trace)
+        except Exception as e:
+            logger.debug(f"Trace persistence skipped: {e}")
+
+    def _try_feedback_ingest(self, upper: str, lower: str, score: float) -> None:
+        """Non-blocking attempt to ingest high-scoring couplet into knowledge base."""
+        try:
+            from openprom.infrastructure.config.settings import get_settings
+            settings = get_settings()
+            features = getattr(settings, "features", None)
+            knowledge = getattr(settings, "knowledge", None)
+            if not (features and getattr(features, "knowledge_layer_v2", False)):
+                return
+            if not (knowledge and getattr(knowledge, "enabled", False)):
+                return
+            from openprom.knowledge.memory.feedback import get_feedback_ingestor
+            ingestor = get_feedback_ingestor()
+            content = f"{upper}\n{lower}"
+            ingestor.ingest(content=content, score=score, meter_type="couplet")
+        except Exception as e:
+            logger.debug(f"Feedback ingest skipped: {e}")
 
     @staticmethod
     def _determine_grade(total_score: float) -> str:

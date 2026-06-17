@@ -105,9 +105,39 @@ hermes:
   chunk_quatrains: true
 
 # ====================
+# 知识层 v2（Hermes 升格）
+# ====================
+knowledge:
+  enabled: false                   # master switch: true = use knowledge layer pipeline
+  retrieval:
+    strategy: hybrid               # dense | sparse | hybrid
+    top_k_recall: 20               # candidates before rerank
+    top_k_final: 5                 # final results after rerank
+    rerank:
+      enabled: false               # M2: enable cross-encoder rerank
+      provider: noop               # noop | bge-reranker-v2-m3 | bge-reranker-base
+      weights:
+        semantic: 0.6
+        rule: 0.4
+    fusion:
+      method: rrf
+      rrf_k: 60
+  embedding:
+    provider: sentence_transformers # sentence_transformers | onnx | mock
+    model: BAAI/bge-small-zh-v1.5
+    device: cpu
+  memory:
+    cache_enabled: true
+    cache_ttl_seconds: 3600
+  corpus:
+    active_snapshot: ""
+    fallback_on_empty: true
+
+# ====================
 # 特性开关
 # ====================
 features:
+  knowledge_layer_v2: false        # true = use new knowledge/ pipeline; false = use old services/hermes
   saddle_engineering:
     enabled: true
     strict_mode: false

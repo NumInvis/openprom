@@ -237,6 +237,10 @@ def get_hermes_retriever() -> HermesRetriever:
     if _global_retriever is None:
         from openprom.infrastructure.config.settings import get_settings
         settings = get_settings()
+        # Check if new knowledge layer is enabled
+        features = getattr(settings, "features", None)
+        if features and getattr(features, "knowledge_layer_v2", False):
+            return _get_knowledge_layer_retriever(settings)
         hcfg = getattr(settings, "hermes", None)
         if hcfg is None:
             return HermesRetriever()
@@ -247,3 +251,38 @@ def get_hermes_retriever() -> HermesRetriever:
             enable_hybrid=getattr(hcfg, "enable_hybrid", True),
         )
     return _global_retriever
+
+
+def _get_knowledge_layer_retriever(settings) -> HermesRetriever:
+    """Create a HermesRetriever that delegates to the new knowledge layer pipeline."""
+    from openprom.knowledge.retrieval.pipeline import get_retrieval_pipeline
+
+    pipeline = get_retrieval_pipeline()
+
+    class _KnowledgeRetriever(HermesRetriever):
+        """Thin wrapper: delegates hybrid_search to the knowledge layer pipeline."""
+
+        def __init__(self, pl):
+            self._pipeline = pl
+            self.store = pl.store
+            self._keyword_index = None
+            self._indexed_count = -1
+
+        def hybrid_search(self, query, top_k=5, filters=None):
+            result_set = self._pipeline.retrieve(
+                query=query,
+                top_k=top_k,
+                filters=filters,
+            )
+            # Convert RetrievalResultSet to the old list-of-dicts format
+            return [
+                {
+                    "id": r.id,
+                    "text": r.content,
+                    "metadata": r.metadata,
+                    "hybrid_score": r.final_score,
+                }
+                for r in result_set.results
+            ]
+
+    return _KnowledgeRetriever(pipeline)

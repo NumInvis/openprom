@@ -1,62 +1,52 @@
-"""Couplet generation and completion service with RAG augmentation.
+"""Couplet generation — 3-phase architecture.
 
-Drives an LLM through a tool-calling loop so that every delivered couplet has
-passed the meter check. If the meter gradient cannot descend, rhyme candidates
-are injected as tool results.
+Phase 1 (Inspire)  — LLM gathers inspiration via tools (retrieve_poetry, web_search).
+                     The creative flow is uninterrupted; tools serve the poet.
+Phase 2 (Create)   — Single LLM call, high temperature. Meter pattern injected as
+                     context so the LLM creates WITH form in mind, not against it.
+Phase 3 (Refine)   — check_meter returns actionable fixes; LLM applies targeted
+                     corrections. Max 2 rounds. Temperature drops to 0.3 for precision.
+
+Streaming paths still use LLMClient.stream_progress directly.
 """
 
 import logging
+import time
+import uuid
 from typing import Any, Dict, Iterable, Optional
 
 from openprom.infrastructure.config.settings import get_settings
 from openprom.services.llm_client import LLMClient, get_llm_client
-from openprom.services.rag.poetry_knowledge import get_poetry_knowledge
 from openprom.tools.registry import get_tool_registry
 
 logger = logging.getLogger(__name__)
 
-COUPLET_SYSTEM_PROMPT = """你是一位精通中国古典诗词对联的 AI 助手。
 
-任务：根据用户输入生成或补全一副对联。
+# ---------------------------------------------------------------------------
+# System prompts — minimal, evocative, not prescriptive
+# ---------------------------------------------------------------------------
 
-规则：
-1. 对联分为上联和下联，用换行符分隔，每联 5 或 7 字（用户指定时依用户）。
-2. 上下联字数必须相等。
-3. 必须满足：二四六位置平仄相对；上联尾字为仄声，下联尾字为平声；避免三平尾、三仄尾。
-4. 上下联需语义相关、对仗工整，并学习古人诗作中的意象、用词与含蓄表达，避免口水化、现代白话化。
-5. 生成前可调用 retrieve_poems 或 retrieve_imagery 获取古人诗作参考，以提升意象与用词典雅度。
-6. 生成后必须调用 check_meter 工具进行格律检测；未通过则根据工具反馈修正。
-7. 如果某字无法通过自身知识修正，必须调用 get_rhyme_candidates 获取候选字。
-8. 最终交付的内容必须是 check_meter 返回 is_compliant=true 的结果。
+_INSPIRE_PROMPT = (
+    "你是诗歌创作助手。帮助诗人搜集灵感。\n"
+    "调用 retrieve_poetry 检索古人诗作，或 web_search 搜索知识。\n"
+    "也可以直接跳过。准备好后，用3-5句话总结创作方向和可用的意象/典故。"
+)
 
-请用中文思考并输出最终对联。"""
+_CREATE_PROMPT = (
+    "你是当代最顶尖的对联大师。\n"
+    "先有灵感，再求工稳；先有境界，再求技巧。\n"
+    "直接输出上下联，用换行分隔，不要任何解释。"
+)
+
+_REFINE_PROMPT = (
+    "精准修改以下对联的格律问题，保持原作意境和风格。\n"
+    "直接输出修改后的上下联，用换行分隔，不要任何解释。"
+)
 
 
-def _build_prompt(
-    mode: str,
-    prompt: str,
-    length: Optional[int] = None,
-) -> str:
-    settings = get_settings()
-    length = length or settings.generation.couplet_default_length
-
-    if mode == "generate":
-        base = f"请根据主题/提示“{prompt}”创作一副 {length} 字对联。"
-    else:  # complete
-        base = (
-            f"请补全下联，使得上下联组成一副工整的 {length} 字对联。"
-            f"用户输入：{prompt}"
-        )
-
-    base += (
-        f"\n要求：\n"
-        f"- 每联 {length} 字\n"
-        f"- 借鉴古人诗作的意象、对仗与用词，力求典雅含蓄\n"
-        f"- 先输出候选对联，然后调用 check_meter 检测\n"
-        f"- 未通过检测则修正，最多尝试 {settings.generation.couplet_max_revision_rounds} 轮\n"
-        f"- 如韵脚无法下降，调用 get_rhyme_candidates 获取候选韵字\n"
-    )
-    return base
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _normalize_result(content: str) -> str:
@@ -65,8 +55,6 @@ def _normalize_result(content: str) -> str:
     import re
 
     text = content
-
-    # 0. If the LLM returned a JSON tool result, extract the poem text first.
     stripped = content.strip()
     if stripped.startswith("{") and stripped.endswith("}"):
         try:
@@ -76,12 +64,11 @@ def _normalize_result(content: str) -> str:
         except json.JSONDecodeError:
             pass
 
-    # 1. Try explicit markers
-    upper = None
-    lower = None
+    # Try explicit markers
+    upper = lower = None
     for line in text.split("\n"):
         line = line.strip()
-        if not line or line.startswith("```") or line.startswith("|"):
+        if not line or line.startswith(("```", "|")):
             continue
         if "上联" in line and "下联" in line:
             parts = re.split(r"下联[：:]", line)
@@ -96,7 +83,7 @@ def _normalize_result(content: str) -> str:
     if upper and lower:
         return f"{upper}\n{lower}"
 
-    # 2. Heuristic: last two lines of equal length that are mostly Chinese
+    # Heuristic: last two lines of equal length, mostly Chinese
     chinese_lines = []
     for line in text.split("\n"):
         line = line.strip().lstrip(">*•- ")
@@ -106,7 +93,6 @@ def _normalize_result(content: str) -> str:
             chinese_lines.append(line)
 
     if len(chinese_lines) >= 2:
-        # prefer last two of equal length
         for i in range(len(chinese_lines) - 1, 0, -1):
             if len(chinese_lines[i]) == len(chinese_lines[i - 1]) and len(chinese_lines[i]) >= 4:
                 return f"{chinese_lines[i-1]}\n{chinese_lines[i]}"
@@ -115,37 +101,159 @@ def _normalize_result(content: str) -> str:
     return text.strip()[-200:]
 
 
+def _persist_trace(trace) -> None:
+    """Best-effort trace persistence."""
+    try:
+        from openprom.infrastructure.task_trace import get_task_trace_store
+        get_task_trace_store().save(trace)
+    except Exception as e:
+        logger.debug("Trace persistence skipped: %s", e)
+
+
+def _get_meter_context(length: int) -> str:
+    """Query the meter template and return a human-readable pattern string."""
+    try:
+        from openprom.tools.poetry_tools import check_meter_unified
+
+        form = "七律" if length == 7 else "五律" if length == 5 else "七律"
+        result = check_meter_unified(action="meter_template", form=form)
+        if result.get("found"):
+            lines = []
+            for p in result["patterns"][:4]:
+                lines.append(f"{p['name']}：{p['pattern']}")
+            return "\n".join(lines)
+        return ""
+    except Exception:
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# CoupletGenerator — 3-phase architecture
+# ---------------------------------------------------------------------------
+
+
 class CoupletGenerator:
-    """Agent for couplet generation and completion."""
+    """Couplet generation via 3-phase architecture.
+
+    Phase 1 (Inspire): tool-calling for gathering inspiration.
+    Phase 2 (Create): single LLM call, high temperature, meter as context.
+    Phase 3 (Refine): check_meter + targeted fix, max 2 rounds.
+    """
 
     def __init__(self, client: Optional[LLMClient] = None):
         self._client = client or get_llm_client()
         self._tools = list(get_tool_registry().values())
         self._settings = get_settings()
-        self._knowledge = get_poetry_knowledge()
 
-    def _build_augmented_prompt(
-        self,
-        mode: str,
-        prompt: str,
-        length: Optional[int] = None,
+    # -- Phase 1: Inspire ------------------------------------------------
+
+    def _phase_inspire(self, theme: str, mode: str, length: int, trace) -> str:
+        """Gather inspiration via tool-calling. LLM decides what to use."""
+        if mode == "generate":
+            user_prompt = f"主题：{theme}\n每联{length}字对联。请搜集灵感。"
+        else:
+            user_prompt = f"上联：{theme}\n需要补全{length}字下联。请搜集灵感。"
+
+        result = self._client.chat_with_tools(
+            prompt=user_prompt,
+            tools=self._tools,
+            system_prompt=_INSPIRE_PROMPT,
+            max_rounds=2,
+            temperature=0.7,
+        )
+
+        content = result.get("content", "")
+        trace.add_step("llm_call", {
+            "phase": "inspire",
+            "content_preview": content[:200],
+        })
+        return content
+
+    # -- Phase 2: Create -------------------------------------------------
+
+    def _phase_create(
+        self, theme: str, mode: str, length: int, inspiration: str, trace,
     ) -> str:
-        base = _build_prompt(mode, prompt, length)
-        if not self._settings.rag.enabled:
-            return base
+        """Single LLM call — free creation with meter context injected."""
+        meter_ctx = _get_meter_context(length)
 
-        try:
-            examples = self._knowledge.retrieve_examples(
-                theme=prompt,
-                form=None,
-                top_k=self._settings.rag.retrieve_top_k,
+        if mode == "generate":
+            prompt = (
+                f"主题：{theme}\n每联{length}字。\n\n"
+                f"格律参考：\n{meter_ctx}\n\n"
+                f"灵感素材：\n{inspiration[:500]}\n\n"
+                f"请创作一副对联。直接输出上下联，用换行分隔。"
             )
-            if examples:
-                context = self._knowledge.format_imagery(examples)
-                base = f"{context}\n\n{base}\n请以上述古人诗作的意象与用词为参考，但不要直接抄袭原句。"
-        except Exception as e:
-            logger.warning(f"RAG retrieval failed: {e}")
-        return base
+        else:
+            prompt = (
+                f"上联：{theme}\n补全{length}字下联。\n\n"
+                f"格律参考：\n{meter_ctx}\n\n"
+                f"灵感素材：\n{inspiration[:500]}\n\n"
+                f"请补全下联。直接输出完整上下联，用换行分隔。"
+            )
+
+        result = self._client.chat(
+            prompt=prompt,
+            system_prompt=_CREATE_PROMPT,
+            temperature=0.9,
+        )
+
+        content = result.get("content", "")
+        trace.add_step("llm_call", {
+            "phase": "create",
+            "temperature": 0.9,
+            "content_preview": content[:200],
+        })
+        return content
+
+    # -- Phase 3: Refine -------------------------------------------------
+
+    def _phase_refine(self, draft: str, meter_type: str, trace) -> str:
+        """Verify meter and apply targeted fixes. Max 2 rounds."""
+        from openprom.tools.poetry_tools import check_meter_unified
+
+        for round_idx in range(2):
+            check = check_meter_unified(action="check", text=draft, meter_type=meter_type)
+
+            if check.get("is_compliant"):
+                trace.add_step("meter_check", {"round": round_idx + 1, "passed": True})
+                return draft
+
+            fixes = check.get("fixes", [])
+            violations = check.get("violations", [])
+
+            fix_lines = []
+            for f in fixes:
+                desc = f.get("description", "")
+                candidates = f.get("rhyme_candidates", [])
+                if candidates:
+                    fix_lines.append(f"{desc}（候选：{''.join(candidates[:8])}）")
+                else:
+                    fix_lines.append(desc)
+
+            fix_text = "\n".join(fix_lines) if fix_lines else "\n".join(violations)
+
+            refine_prompt = (
+                f"以下对联有格律问题，请精准修改：\n\n{draft}\n\n"
+                f"问题：\n{fix_text}\n\n"
+                f"请直接输出修改后的上下联，用换行分隔，不要解释。"
+            )
+
+            result = self._client.chat(
+                prompt=refine_prompt,
+                system_prompt=_REFINE_PROMPT,
+                temperature=0.3,
+            )
+            draft = result.get("content", draft)
+            trace.add_step("llm_call", {
+                "phase": "refine",
+                "round": round_idx + 1,
+                "fixes_applied": len(fixes),
+            })
+
+        return draft
+
+    # -- Public API ------------------------------------------------------
 
     def generate(
         self,
@@ -154,16 +262,38 @@ class CoupletGenerator:
         max_rounds: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Generate a couplet from a theme/prompt."""
-        prompt_text = self._build_augmented_prompt("generate", prompt, length)
-        max_rounds = max_rounds or self._settings.generation.couplet_max_revision_rounds
-        result = self._client.chat_with_tools(
-            prompt=prompt_text,
-            tools=self._tools,
-            system_prompt=COUPLET_SYSTEM_PROMPT,
-            max_rounds=max_rounds,
+        from openprom.agents import TaskTrace
+
+        settings = self._settings
+        length = length or settings.generation.couplet_default_length
+
+        trace = TaskTrace(
+            task_name="generate_couplet",
+            task_id=f"cg-{uuid.uuid4().hex[:12]}",
+            started_at=time.time(),
         )
-        content = _normalize_result(result.get("content", ""))
-        return {"couplet": content, "raw_content": result.get("content", ""), "messages": result.get("messages", [])}
+
+        try:
+            inspiration = self._phase_inspire(prompt, "generate", length, trace)
+            draft = self._phase_create(prompt, "generate", length, inspiration, trace)
+            final = self._phase_refine(draft, "couplet", trace)
+
+            normalized = _normalize_result(final)
+            trace.success = True
+            trace.finished_at = time.time()
+            _persist_trace(trace)
+
+            return {
+                "couplet": normalized,
+                "raw_content": final,
+                "trace": trace,
+            }
+        except Exception as e:
+            trace.success = False
+            trace.error = str(e)
+            trace.finished_at = time.time()
+            _persist_trace(trace)
+            raise
 
     def complete(
         self,
@@ -172,16 +302,38 @@ class CoupletGenerator:
         max_rounds: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Complete a couplet from a partial input."""
-        prompt_text = self._build_augmented_prompt("complete", prompt, length)
-        max_rounds = max_rounds or self._settings.generation.couplet_max_revision_rounds
-        result = self._client.chat_with_tools(
-            prompt=prompt_text,
-            tools=self._tools,
-            system_prompt=COUPLET_SYSTEM_PROMPT,
-            max_rounds=max_rounds,
+        from openprom.agents import TaskTrace
+
+        settings = self._settings
+        length = length or settings.generation.couplet_default_length
+
+        trace = TaskTrace(
+            task_name="complete_couplet",
+            task_id=f"cc-{uuid.uuid4().hex[:12]}",
+            started_at=time.time(),
         )
-        content = _normalize_result(result.get("content", ""))
-        return {"couplet": content, "raw_content": result.get("content", ""), "messages": result.get("messages", [])}
+
+        try:
+            inspiration = self._phase_inspire(prompt, "complete", length, trace)
+            draft = self._phase_create(prompt, "complete", length, inspiration, trace)
+            final = self._phase_refine(draft, "couplet", trace)
+
+            normalized = _normalize_result(final)
+            trace.success = True
+            trace.finished_at = time.time()
+            _persist_trace(trace)
+
+            return {
+                "couplet": normalized,
+                "raw_content": final,
+                "trace": trace,
+            }
+        except Exception as e:
+            trace.success = False
+            trace.error = str(e)
+            trace.finished_at = time.time()
+            _persist_trace(trace)
+            raise
 
     def generate_stream(
         self,
@@ -189,13 +341,13 @@ class CoupletGenerator:
         length: Optional[int] = None,
         max_rounds: Optional[int] = None,
     ) -> Iterable[str]:
-        """Yield SSE data lines for generation progress."""
-        prompt_text = self._build_augmented_prompt("generate", prompt, length)
+        """Yield SSE data lines (streaming path — uses tool loop directly)."""
+        prompt_text = f"主题：{prompt}\n每联{length or 7}字对联。请创作。"
         max_rounds = max_rounds or self._settings.generation.couplet_max_revision_rounds
         yield from self._client.stream_progress(
             prompt=prompt_text,
             tools=self._tools,
-            system_prompt=COUPLET_SYSTEM_PROMPT,
+            system_prompt=_CREATE_PROMPT,
             max_rounds=max_rounds,
         )
 
@@ -205,13 +357,13 @@ class CoupletGenerator:
         length: Optional[int] = None,
         max_rounds: Optional[int] = None,
     ) -> Iterable[str]:
-        """Yield SSE data lines for completion progress."""
-        prompt_text = self._build_augmented_prompt("complete", prompt, length)
+        """Yield SSE data lines (streaming path — uses tool loop directly)."""
+        prompt_text = f"上联：{prompt}\n请补全下联。"
         max_rounds = max_rounds or self._settings.generation.couplet_max_revision_rounds
         yield from self._client.stream_progress(
             prompt=prompt_text,
             tools=self._tools,
-            system_prompt=COUPLET_SYSTEM_PROMPT,
+            system_prompt=_CREATE_PROMPT,
             max_rounds=max_rounds,
         )
 

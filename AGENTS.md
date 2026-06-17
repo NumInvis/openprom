@@ -1,141 +1,147 @@
-# AGENTS.md — OpenPROM project guide
+# AGENTS.md — OpenPROM
 
-## Project overview
+## What this is
 
-OpenPROM is a pure AI-application-layer Chinese poetry assistant. The sole active interface is the FastAPI web service (`python -m openprom.api`). All local models (BERT/Qwen) have been removed; scoring, generation, and completion rely entirely on LLM API calls plus lightweight rule-based engines (ping-ze, meter patterns, rhyme books) exposed as LLM-callable Tools. Meter detection is a mandatory Tool in the generation/completion agentic loop: content is not delivered until `check_meter` returns compliant, and rhyme candidates are proactively supplied when the meter gradient cannot descend.
+OpenPROM v4.3.0: pure-LLM Chinese poetry assistant (couplet scoring/generation/completion, regulated verse, meter checking). No local models — all intelligence via remote LLM (OpenAI-compatible protocol). Rule engines (pingze, meter, rhyme) exist only as LLM Tools.
+
+Single entrypoint: `python -m openprom.api` (FastAPI on port 8000). CLI/TUI removed.
 
 ## Commands
 
 ```bash
-# Run the server
-python -m openprom.api
+pip install -r requirements.txt
+cp .env.example .env               # then fill OPENPROM_API_KEY
 
-# Run tests
-pytest tests/
+python -m openprom.api             # start server
+uvicorn openprom.api:app --reload  # dev mode with hot reload
 
-# Lint
-ruff check openprom/ tests/
+pytest tests/                      # all tests
+pytest tests/test_integration.py tests/test_routers.py tests/test_services.py  # no API key needed
+pytest tests/test_couplet.py       # needs real OPENPROM_API_KEY
+pytest tests/test_web_interface.py # needs running server + Playwright
 
-# Docker (full stack: api + redis + prometheus + grafana)
-docker-compose up -d
+ruff check openprom/ tests/ scripts/
+ruff format openprom/ tests/ scripts/
 ```
 
-## Required setup
+Config: `ruff` target py39, line-length 100. Test root: `tests/`.
 
-- Copy `.env.example` to `.env` and set `OPENPROM_API_KEY` — the server fails without it
-- Set `OPENPROM_BASE_URL` to your LLM gateway (e.g. `https://your-llm-gateway.example.com/ai/v1`) and `OPENPROM_MODEL` to your model name
-- `config.json` is gitignored (holds secrets); env vars take precedence over it
-
-## Architecture
+## Project structure
 
 ```
-openprom/
-  api.py              ← FastAPI entrypoint (also runnable as __main__)
-  __init__.py         ← version + public API exports
-  routers/
-    common.py         ← shared Pydantic models, error codes, dependencies
-    meter.py          ← meter detection routes
-    couplet.py        ← couplet scoring / generation / completion routes
-    shi.py            ← regulated-verse generation / completion routes
-    health.py         ← health check
-  services/
-    llm_client.py     ← unified OpenAI-compatible client + tool loop + streaming
-    meter_tool.py     ← meter detection as LLM Tool + rhyme candidate hints
-    couplet_scorer.py ← couplet scoring (LLM + rule-based formal analysis)
-    couplet_generator.py ← couplet generation/completion agent
-    shi_generator.py  ← regulated-verse generation/completion agent
-  tools/
-    schemas.py        ← Tool JSON Schemas
-    registry.py       ← Tool registry for agents
-  core/
-    saddle_engineering.py ← multi-layer LLM output control
-    base_analyzer.py    ← shared helpers (formal analysis, grading, overall comment)
-  engines/
-    meter.py          ← meter pattern matching (thread-safe singleton via get_engine())
-    pingze.py         ← ping-ze tone detection (thread-safe singleton via get_engine())
+openprom/                          # main Python package
+  __init__.py                      # v4.3.0, public API exports
+  api.py                           # FastAPI app factory + lifespan
+  routers/                         # API route layer
+    common.py                      # shared Pydantic models, PormErrorCode, PormHTTPException
+    couplet.py / shi.py / meter.py / health.py
+  agents/                          # orchestration layer (M3)
+    __init__.py                    # TaskConfig, TaskTrace, TaskRegistry, QueryPlanner
+  services/                        # application services
+    llm_client.py                  # OpenAI-compatible client + tool loop + streaming
+    meter_tool.py                  # meter check as LLM Tool + rhyme candidate hints
+    couplet_scorer.py              # scoring (LLM + rule-based formal analysis)
+    couplet_generator.py / shi_generator.py  # generation agents
+    hermes/                        # legacy retriever (delegates to knowledge/ when flag enabled)
+      indexer.py / retriever.py / skills.py / tools.py
+    rag/                           # backward-compat PoetryKnowledge adapter
+  knowledge/                       # knowledge layer v2 (Hermes upgrade)
+    schema.py                      # Provenance, RetrievalResult, RetrievalResultSet
+    rule_signals.py                # meter/rhyme/form signals for rerank fusion
+    metrics.py                     # Prometheus metrics (retrieval/latency/rerank/cache)
+    providers/                     # swappable provider abstractions
+      __init__.py                  # EmbeddingProvider/RerankProvider Protocols + factories
+      vector_store.py              # ChromaVectorStore
+      embedding/                   # SentenceTransformer + ONNX + Mock
+      rerank/                      # ONNX + SentenceTransformer + NoOp
+    retrieval/
+      pipeline.py                  # 5-stage pipeline + QueryPlanner + RerankCache
+    skills/
+      classic.py                   # 5 skills (Poetry/Imagery/Line/RhymeContext/Form)
+    memory/
+      cache.py                     # RetrievalCache + RerankCache (TTL)
+      feedback.py                  # FeedbackIngestor (dual-gate: meter + score)
+    indexing/
+      normalizer.py / enricher.py / validator.py / corpus_builder.py
+  tools/                           # LLM Tool layer
+    schemas.py                     # JSON Schema definitions
+    registry.py                    # tool registry
+  core/                            # domain layer
+    saddle_engineering.py          # multi-layer LLM output quality control
+    base_analyzer.py               # formal analysis shared utils
+  engines/                         # thread-safe singletons
+    meter.py                       # meter pattern matching
+    pingze.py                      # pingze detection
   infrastructure/
-    cache.py          ← Redis with in-memory LRU fallback
-    database.py       ← SQLAlchemy (SQLite default, PostgreSQL)
-    logging.py        ← structured JSON logging
+    database.py                    # SQLAlchemy (default SQLite)
+    task_trace.py                  # task trace persistence (M3)
+    cache.py                       # Redis + memory LRU fallback
+    logging.py                     # structured logging
     config/
-      prompt_config.py ← Jinja2 prompt templates, hot-reload from YAML
-      prompts/*.yaml   ← externalized LLM prompts
-      settings.py      ← loads config/settings.yaml
+      settings.py                  # loads config/settings.yaml
+      prompt_config.py             # Jinja2 prompt templates, hot-reloadable
+      prompts/*.yaml               # externalized LLM prompts
   data/
-    loader.py         ← rhyme books & meter patterns from JSON
-    meters.json, rhymebooks.json, ci-meters.json
+    loader.py                      # rhymebook + meter template loader
+    meters.json / rhymebooks.json / ci-meters.json
   utils/
-    env_config.py     ← env var → config.json fallback chain
-    scoring.py        ← normalize_score, calculate_weighted_score, clamp_score
-    json_parser.py    ← LLM JSON response parser
-frontend/
-  index.html, styles.css, app.js ← multi-tab SPA served as static files
-config/
-  settings.yaml       ← scoring weights, model params, tool/agent config
+    env_config.py                  # reads OPENPROM_* env vars
+    json_parser.py                 # LLM JSON response parser
+    scoring.py                     # score normalization helpers
+frontend/                          # static SPA (served at /)
+config/settings.yaml               # scoring weights, tool/agent config, RAG config
 scripts/
-  setup_config.py     ← interactive config.json generator
+  setup_config.py                  # interactive config.json generator
+  index_poetry.py                  # index poetry corpus into Hermes vector store
 ```
 
-## Deleted modules (no longer exist)
+## Configuration
 
-- `openprom/core/dual_api_scorer.py` — replaced by `services/couplet_scorer.py`
-- `openprom/core/analyzer.py` — compat layer
-- `openprom/core/analyzer_interface.py` — abstract interface
-- `openprom/core/fusion_engine.py` — BERT+LLM fusion
-- `openprom/main.py`, `openprom/tui_launcher.py`, `openprom/ui/` — CLI/TUI interfaces
-- `models/bert-base-chinese/` — local model directory
-- `tests/test_dual_api.py`, `tests/test_api_full.py` — BERT-dependent test scripts
+Priority: **env vars > config.json > config/settings.yaml defaults**.
 
-## Scoring flow
+Required: `OPENPROM_API_KEY`. Without it, the server starts but fails on first LLM call.
 
-1. `analyze_formal()` — pingze + length + basic rules → formal_score, pingze_score, warnings
-2. `_first_call()` — LLM impression + special_attention
-3. `_second_call()` — LLM deep technique + rhetoric analysis
-4. `SaddleEngineering.execute()` — Input→Process→Output control layers validate and correct scores
-5. Weighted combination → total_score → grade
+Key optional: `OPENPROM_BASE_URL`, `OPENPROM_MODEL`, `OPENPROM_DATABASE_URL` (default sqlite), `OPENPROM_REDIS_URL`, `OPENPROM_CACHE_ENABLED` (default false), `OPENPROM_LOG_FORMAT` (default `json` in Docker, use `text` for dev).
 
-## Generation / completion agentic flow
+`.env` auto-loaded by python-dotenv. `config.json` is gitignored, generated via `scripts/setup_config.py`.
 
-1. LLM generates candidate text based on user prompt
-2. `check_meter` Tool validates the candidate
-3. If compliant → deliver result
-4. If not compliant:
-   - If rhyme position is wrong → `get_rhyme_candidates` Tool supplies candidates
-   - Tool result (violations + suggestions) is fed back to LLM
-   - LLM revises and re-checks
-5. After max revision rounds, deliver best-effort result with remaining violations if configured
+## Dev conventions
 
-## API endpoints
+- **Singletons**: `LLMClient`, `MeterEngine`, `PingZeEngine` use `get_*()` factories — don't instantiate directly.
+- **Config access**: `openprom.infrastructure.config.get_settings()` for app config; `openprom.utils.env_config` for secrets/env vars.
+- **Logging**: `openprom.infrastructure.logging.get_logger(__name__)`.
+- **Prompts**: all in `openprom/infrastructure/config/prompts/*.yaml` (Jinja2, hot-reload at 30s poll).
+- **Error codes**: use `PormErrorCode` enum and `PormHTTPException` from `routers.common`.
+- **New API endpoints**: define request/response Pydantic models in `routers/common.py`.
+- **Cache**: disabled by default; when enabled, Redis failure auto-degrades to memory LRU (no crash).
+- **RAG/Hermes**: enabled by default; empty vector store = warning only, generation continues.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/api/v1/meter/check` | Meter detection (also an LLM Tool) |
-| GET | `/api/v1/meter/list` | List meter patterns |
-| POST | `/api/v1/couplet/analyze` | Couplet scoring |
-| POST | `/api/v1/couplet/generate` | Couplet generation (streaming SSE) |
-| POST | `/api/v1/couplet/complete` | Couplet completion (streaming SSE) |
-| POST | `/api/v1/shi/generate` | Regulated-verse generation (streaming SSE) |
-| POST | `/api/v1/shi/complete` | Regulated-verse completion (streaming SSE) |
-| GET | `/api/v1/couplet/history` | Session history |
-| GET | `/api/v1/couplet/statistics` | Statistics |
-| GET | `/metrics` | Prometheus metrics |
+## Removed modules (v4.3.0)
 
-## Testing notes
+These no longer exist. If you find references, clean them up:
 
-- `tests/test_integration.py` — 8 integration tests
-- `tests/test_couplet.py` — real API scoring test (needs `OPENPROM_API_KEY`)
-- `tests/test_services.py` — new service unit tests
-- `tests/test_routers.py` — router/API tests
-- `tests/test_web_interface.py` — Playwright web UI test (needs server running)
+- `core/dual_api_scorer.py` → replaced by `services/couplet_scorer.py`
+- `core/analyzer.py`, `core/analyzer_interface.py`, `core/fusion_engine.py` (BERT+LLM fusion) → removed
+- `main.py`, `tui_launcher.py`, `ui/` (CLI/TUI) → removed
+- `tests/test_dual_api.py`, `tests/test_api_full.py` → removed
 
-## Style & conventions
+## Gotchas
 
-- Python 3.9+, ruff target-version py39, line-length 100
-- Config hierarchy: env vars > config.json > config/settings.yaml defaults
-- Prompt templates: Jinja2 in `openprom/infrastructure/config/prompts/*.yaml`
-- Cache: Redis optional (`OPENPROM_CACHE_ENABLED=false` by default); falls back to in-memory LRU
-- Database: SQLite default (`openprom.db`), set `OPENPROM_DATABASE_URL` for PostgreSQL
-- Version: all files unified to 4.3.0
-- Technique weights: llm_technique:0.50 + llm_rhetoric:0.50
-- Total weights: formal:0.30 + technique:0.30 + artistic:0.30 + impression:0.10
+- The `utils/` package contains `env_config.py` (env var reader), `json_parser.py`, and `scoring.py` — it's the bridge between env/config layer and services.
+- `test_couplet.py` hits a real LLM API — never run it in CI without `OPENPROM_API_KEY` set.
+- `test_web_interface.py` uses Playwright and requires a running server.
+- Docker build auto-creates DB tables via `database.get_db_manager().create_tables()` in the Dockerfile.
+- Prometheus metrics prefix is `porm_` (not `openprom_`).
+- Prompt templates in `prompts/*.yaml` use Jinja2 — changes take effect without restart (30s poll).
+- `ARCHITECTURE.md` is stale on some points (still references CLI/TUI, BERT). Trust `AGENTS.md` over it.
+
+## Security
+
+Never commit: `OPENPROM_API_KEY`, `config.json`, `.env`, `.env.local`. All are in `.gitignore`.
+
+## Checklist before committing
+
+1. `ruff check openprom/ tests/`
+2. `pytest tests/test_integration.py tests/test_routers.py tests/test_services.py`
+3. New API → Pydantic models in `routers/common.py`?
+4. Config via `get_settings()` or `env_config`, not hardcoded?
