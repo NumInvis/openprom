@@ -7,6 +7,8 @@
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import IntEnum
+import json
+import os
 import threading
 
 from openprom.data.loader import RhymeBook
@@ -53,12 +55,14 @@ class PingZeEngine:
 
     支持多级数据源：
     1. 韵书查询（最高优先级）
-    2. pypinyin拼音库（备用）
-    3. 默认未知（兜底）
+    2. 入声字表（中古入声字一律仄声）
+    3. pypinyin拼音库（备用）
+    4. 默认未知（兜底）
     """
 
     # 置信度配置
-    CONFIDENCE_RHYMEBOOK = 0.95  # 韵书置信度
+    CONFIDENCE_RHYMEBOOK = 0.95   # 韵书置信度
+    CONFIDENCE_RUSHENG = 0.90    # 入声字表置信度
     CONFIDENCE_PYPINYIN = 0.60   # 拼音库置信度
     CONFIDENCE_UNKNOWN = 0.0     # 未知置信度
 
@@ -69,8 +73,19 @@ class PingZeEngine:
             default_book: 默认使用的韵书名称
         """
         self._cache: Dict[str, PingZeResult] = {}
+        self._cache_lock = threading.Lock()
         self._rhyme = RhymeBook.get()
         self._default_book = default_book
+        self._rusheng_chars = self._load_rusheng()
+
+    def _load_rusheng(self) -> set:
+        """加载入声字表"""
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "rusheng.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
 
     def analyze(self, char: str) -> PingZeResult:
         """分析单个汉字的平仄
@@ -81,20 +96,30 @@ class PingZeEngine:
         Returns:
             PingZeResult对象
         """
-        # 检查缓存
-        if char in self._cache:
-            return self._cache[char]
+        # 检查缓存（线程安全）
+        with self._cache_lock:
+            if char in self._cache:
+                return self._cache[char]
 
         # 1. 尝试韵书查询
         result = self._analyze_by_rhymebook(char)
         if result is not None:
-            self._cache[char] = result
+            with self._cache_lock:
+                self._cache[char] = result
             return result
 
-        # 2. 尝试拼音库
+        # 2. 尝试入声字表
+        result = self._analyze_by_rusheng(char)
+        if result is not None:
+            with self._cache_lock:
+                self._cache[char] = result
+            return result
+
+        # 3. 尝试拼音库
         result = self._analyze_by_pypinyin(char)
         if result is not None:
-            self._cache[char] = result
+            with self._cache_lock:
+                self._cache[char] = result
             return result
 
         # 3. 返回未知
@@ -104,7 +129,8 @@ class PingZeEngine:
             method="unknown",
             confidence=self.CONFIDENCE_UNKNOWN
         )
-        self._cache[char] = result
+        with self._cache_lock:
+            self._cache[char] = result
         return result
 
     def _analyze_by_rhymebook(self, char: str) -> Optional[PingZeResult]:
@@ -116,6 +142,17 @@ class PingZeEngine:
                 pingze=tone,
                 method="rhymebook",
                 confidence=self.CONFIDENCE_RHYMEBOOK
+            )
+        return None
+
+    def _analyze_by_rusheng(self, char: str) -> Optional[PingZeResult]:
+        """通过入声字表分析平仄（中古入声字一律算仄声）"""
+        if char in self._rusheng_chars:
+            return PingZeResult(
+                char=char,
+                pingze=PingZeValue.ZE,
+                method="rusheng",
+                confidence=self.CONFIDENCE_RUSHENG
             )
         return None
 
@@ -183,7 +220,8 @@ class PingZeEngine:
 
     def clear_cache(self):
         """清除缓存"""
-        self._cache.clear()
+        with self._cache_lock:
+            self._cache.clear()
 
 
 # 全局引擎实例（线程安全）

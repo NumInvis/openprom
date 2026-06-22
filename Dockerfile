@@ -18,8 +18,6 @@ RUN pip install --upgrade pip && \
 
 COPY . .
 
-RUN python -c "from openprom.infrastructure.database import get_db_manager; get_db_manager().create_tables()"
-
 EXPOSE 8000
 
-CMD ["uvicorn", "openprom.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -c 'from openprom.infrastructure.database import get_db_manager; get_db_manager().create_tables()' && uvicorn openprom.api:app --host 0.0.0.0 --port 8000"]

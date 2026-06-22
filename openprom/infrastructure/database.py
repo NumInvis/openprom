@@ -229,10 +229,10 @@ class DatabaseManager:
         finally:
             session.close()
     
-    def save_couplet_analysis(self, score_result) -> CoupletAnalysis:
+    def save_couplet_analysis(self, score_result, **kwargs) -> CoupletAnalysis:
         """保存对联分析结果"""
         with self.get_session() as session:
-            record = CoupletAnalysis.from_score(score_result)
+            record = CoupletAnalysis.from_score(score_result, **kwargs)
             session.add(record)
             session.flush()
             logger.debug(f"保存对联分析记录：ID={record.id}")

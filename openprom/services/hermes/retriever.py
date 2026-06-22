@@ -5,7 +5,6 @@ simple token-overlap fallback) via Reciprocal Rank Fusion (RRF).
 """
 
 import logging
-import os
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 

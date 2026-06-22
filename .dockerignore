@@ -75,7 +75,8 @@ temp/
 *.tmp
 
 # Docker
-data/
+data/*.db
+data/vector_store/
 
 # Grafana
 grafana_data/

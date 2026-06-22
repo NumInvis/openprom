@@ -21,6 +21,9 @@ router = APIRouter(prefix="/api/v1/couplet", tags=["对联"])
 
 
 def _build_response(score: Any, processing_time_ms: float) -> Dict[str, Any]:
+    from openprom.engines.pingze import get_sequence
+    pingze_upper = get_sequence(score.upper) if score.upper else []
+    pingze_lower = get_sequence(score.lower) if score.lower else []
     return {
         "upper": score.upper,
         "lower": score.lower,
@@ -36,8 +39,8 @@ def _build_response(score: Any, processing_time_ms: float) -> Dict[str, Any]:
         "processing_time_ms": processing_time_ms,
         "detail": {
             "word_analysis": score.word_analysis,
-            "pingze_upper": score.pingze_score,
-            "pingze_lower": score.pingze_score,
+            "pingze_upper": pingze_upper,
+            "pingze_lower": pingze_lower,
         },
     }
 
@@ -90,10 +93,15 @@ async def couplet_analyze(
     response = _build_response(score, round((time.time() - start) * 1000, 2))
     response["cached"] = False
     response["session_id"] = x_session_id or str(uuid.uuid4())
+    response["request_id"] = str(uuid.uuid4())
 
     try:
         db = get_db_manager()
-        record = db.save_couplet_analysis(score)
+        record = db.save_couplet_analysis(
+            score,
+            session_id=x_session_id,
+            request_id=response["request_id"],
+        )
         response["id"] = record.id if hasattr(record, "id") else None
     except Exception as e:
         logger.warning(f"Failed to persist analysis: {e}")
@@ -141,8 +149,8 @@ async def couplet_history(x_session_id: str = Header(default=None, alias="X-Sess
         return {"items": []}
     try:
         db = get_db_manager()
-        records = db.get_session_history(x_session_id)
-        return {"items": records}
+        records = db.get_couplet_history(session_id=x_session_id)
+        return {"items": [r.to_dict() for r in records]}
     except Exception as e:
         logger.warning(f"Failed to load history: {e}")
         return {"items": []}
@@ -154,9 +162,13 @@ async def couplet_statistics():
     try:
         db = get_db_manager()
         cache = get_cache_service()
+        stats = db.get_statistics()
+        cache_stats = cache.get_stats()
         return {
-            "total_analyses": db.get_total_count(),
-            "cache_size": cache.size() if hasattr(cache, "size") else 0,
+            "total_analyses": stats.get("total_analyses", 0),
+            "average_score": stats.get("average_score", 0.0),
+            "grade_distribution": stats.get("grade_distribution", {}),
+            "cache_size": cache_stats.get("memory_cache_size", 0),
         }
     except Exception as e:
         logger.warning(f"Failed to load statistics: {e}")

@@ -5,9 +5,7 @@ replays scripted responses to exercise the tool-calling loop logic.
 """
 
 import json
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from openprom.services.llm_client import LLMClient
 from openprom.tools.schemas import Tool
@@ -234,6 +232,56 @@ class TestChatWithTools:
         )
         call_kwargs = client._client.chat.completions.create.call_args.kwargs
         assert call_kwargs["temperature"] == 0.1
+
+
+class TestStreamProgress:
+    def test_stream_progress_yields_events_in_order(self):
+        """stream_progress should yield thinking, tool_call, tool_result, final."""
+        tool = _make_tool(ret={"is_compliant": True})
+        tc = _mock_tool_call("check_meter", {"text": "x"})
+        client = _make_client_with_mock_openai([
+            _mock_response(content=None, tool_calls=[tc]),
+            _mock_response(content="final answer"),
+        ])
+        lines = list(client.stream_progress(
+            prompt="x",
+            tools=[tool],
+            max_rounds=3,
+        ))
+        # Parse data lines, ignoring keep-alive comments
+        events = []
+        for line in lines:
+            if line.startswith(": "):
+                continue
+            assert line.startswith("data: ")
+            events.append(json.loads(line[6:]))
+        event_types = [e["event"] for e in events]
+        assert "thinking" in event_types
+        assert "tool_call" in event_types
+        assert "tool_result" in event_types
+        assert "final" in event_types
+        final_event = events[-1]
+        assert final_event["event"] == "final"
+        assert final_event["content"] == "final answer"
+
+    def test_stream_progress_yields_error_on_exception(self):
+        """When chat_with_tools raises, stream_progress yields event: error."""
+        client = _make_client_with_mock_openai([])
+        # Force an error by providing a tool whose function raises; the error will
+        # propagate after LLM retries are exhausted.
+        tool = _make_tool()
+        tool.func = MagicMock(side_effect=RuntimeError("boom"))
+        tc = _mock_tool_call("check_meter", {"text": "x"})
+        client._client.chat.completions.create = MagicMock(side_effect=[
+            _mock_response(content=None, tool_calls=[tc]),
+        ])
+        lines = list(client.stream_progress(
+            prompt="x",
+            tools=[tool],
+            max_rounds=3,
+        ))
+        events = [json.loads(line[6:]) for line in lines if line.startswith("data: ")]
+        assert events[-1]["event"] == "error"
 
 
 class TestChat:

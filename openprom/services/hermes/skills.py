@@ -1,7 +1,7 @@
 """Hermes skills: reusable retrieval capabilities exposed to agents."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from openprom.services.hermes.retriever import HermesRetriever, get_hermes_retriever
 

@@ -33,6 +33,9 @@ class SentenceTransformerEmbedding:
         self.device = device or os.getenv("OPENPROM_EMBEDDING_DEVICE", "cpu")
         self.dim = dim
         self._model = None
+        # Eagerly attempt to load the model so factory-level fallback to
+        # MockEmbeddingProvider can happen before any retrieval call.
+        self._load_model()
 
     def _load_model(self):
         if self._model is not None:

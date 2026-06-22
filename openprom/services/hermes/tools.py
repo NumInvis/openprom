@@ -1,6 +1,6 @@
 """Hermes skills exposed as LLM-callable tools."""
 
-from typing import Dict, List
+from typing import Dict
 
 from openprom.services.hermes.retriever import HermesRetriever, get_hermes_retriever
 from openprom.services.hermes.skills import (

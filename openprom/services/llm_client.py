@@ -222,34 +222,65 @@ class LLMClient:
     ) -> Iterable[str]:
         """Yield SSE-style data lines for a tool-calling generation process.
 
-        Each yielded string is a JSON object prefixed with "data: " and ends with two newlines,
-        suitable for StreamingResponse with media_type="text/event-stream".
+        Runs the synchronous tool-calling loop in a background thread so that
+        progress events can be streamed to the client as they happen, instead of
+        buffering everything until the loop finishes. A keep-alive comment is sent
+        every few seconds to prevent proxies/browsers from closing the connection
+        during long LLM calls.
         """
+        import queue
+        import threading
 
-        def emit(event: str, payload: Dict[str, Any]) -> None:
-            line = json.dumps({"event": event, **payload}, ensure_ascii=False)
+        event_queue: "queue.Queue[Optional[str]]" = queue.Queue()
+
+        def run() -> None:
+            try:
+
+                def progress_callback(event: str, payload: Dict[str, Any]) -> None:
+                    line = json.dumps({"event": event, **payload}, ensure_ascii=False)
+                    event_queue.put(line)
+
+                result = self.chat_with_tools(
+                    prompt=prompt,
+                    tools=tools,
+                    system_prompt=system_prompt,
+                    max_rounds=max_rounds,
+                    temperature=temperature,
+                    progress_callback=progress_callback,
+                )
+
+                final_line = json.dumps(
+                    {"event": "final", "content": result.get("content", "")},
+                    ensure_ascii=False,
+                )
+                event_queue.put(final_line)
+            except Exception as e:
+                logger.exception("Streaming generation failed")
+                error_line = json.dumps(
+                    {"event": "error", "message": str(e)},
+                    ensure_ascii=False,
+                )
+                event_queue.put(error_line)
+            finally:
+                event_queue.put(None)  # sentinel
+
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+
+        # Stream events as they arrive; emit SSE keep-alive comments while waiting
+        # so that idle connections are not closed by intermediate proxies.
+        while True:
+            try:
+                line = event_queue.get(timeout=5.0)
+            except queue.Empty:
+                yield ": keep-alive\n\n"
+                continue
+
+            if line is None:
+                break
             yield f"data: {line}\n\n"
 
-        buffer: List[str] = []
-
-        def progress_callback(event: str, payload: Dict[str, Any]) -> None:
-            line = json.dumps({"event": event, **payload}, ensure_ascii=False)
-            buffer.append(line)
-
-        result = self.chat_with_tools(
-            prompt=prompt,
-            tools=tools,
-            system_prompt=system_prompt,
-            max_rounds=max_rounds,
-            temperature=temperature,
-            progress_callback=progress_callback,
-        )
-
-        for line in buffer:
-            yield f"data: {line}\n\n"
-
-        final = {"event": "final", "content": result.get("content", "")}
-        yield f"data: {json.dumps(final, ensure_ascii=False)}\n\n"
+        thread.join(timeout=5.0)
 
 
 _client_instance: Optional[LLMClient] = None
