@@ -20,10 +20,10 @@ def calculate_weighted_score(scores: list[float], weights: list[float]) -> float
     """加权平均分数"""
     if len(scores) != len(weights):
         raise ValueError(f"分数数量 ({len(scores)}) 与权重数量 ({len(weights)}) 不匹配")
-    
+
     total_weight = sum(weights)
     if total_weight == 0:
         return 0.0
-    
+
     normalized_weights = [w / total_weight for w in weights]
     return sum(s * w for s, w in zip(scores, normalized_weights))

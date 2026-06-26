@@ -16,17 +16,19 @@ from openprom.data.loader import RhymeBook
 
 class PingZeValue(IntEnum):
     """平仄值枚举"""
-    ZE = -1   # 仄声
-    ZHONG = 0 # 中声（不确定）
+
+    ZE = -1  # 仄声
+    ZHONG = 0  # 中声（不确定）
     PING = 1  # 平声
 
 
 class ConfidenceLevel(IntEnum):
     """置信度等级"""
-    UNKNOWN = 0     # 未知
-    LOW = 1         # 低（拼音推断）
-    MEDIUM = 2      # 中（多音字）
-    HIGH = 3        # 高（韵书确认）
+
+    UNKNOWN = 0  # 未知
+    LOW = 1  # 低（拼音推断）
+    MEDIUM = 2  # 中（多音字）
+    HIGH = 3  # 高（韵书确认）
 
 
 @dataclass(frozen=True)
@@ -39,6 +41,7 @@ class PingZeResult:
         method: 分析方法
         confidence: 置信度 (0-1)
     """
+
     char: str
     pingze: int
     method: str
@@ -47,7 +50,7 @@ class PingZeResult:
     def __post_init__(self):
         # 验证置信度范围
         if not 0.0 <= self.confidence <= 1.0:
-            object.__setattr__(self, 'confidence', max(0.0, min(1.0, self.confidence)))
+            object.__setattr__(self, "confidence", max(0.0, min(1.0, self.confidence)))
 
 
 class PingZeEngine:
@@ -61,10 +64,10 @@ class PingZeEngine:
     """
 
     # 置信度配置
-    CONFIDENCE_RHYMEBOOK = 0.95   # 韵书置信度
-    CONFIDENCE_RUSHENG = 0.90    # 入声字表置信度
-    CONFIDENCE_PYPINYIN = 0.60   # 拼音库置信度
-    CONFIDENCE_UNKNOWN = 0.0     # 未知置信度
+    CONFIDENCE_RHYMEBOOK = 0.95  # 韵书置信度
+    CONFIDENCE_RUSHENG = 0.90  # 入声字表置信度
+    CONFIDENCE_PYPINYIN = 0.60  # 拼音库置信度
+    CONFIDENCE_UNKNOWN = 0.0  # 未知置信度
 
     def __init__(self, default_book: str = "平水韵"):
         """初始化引擎
@@ -80,7 +83,9 @@ class PingZeEngine:
 
     def _load_rusheng(self) -> set:
         """加载入声字表"""
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "rusheng.json")
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "data", "rusheng.json"
+        )
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return set(json.load(f))
@@ -127,7 +132,7 @@ class PingZeEngine:
             char=char,
             pingze=PingZeValue.ZHONG,
             method="unknown",
-            confidence=self.CONFIDENCE_UNKNOWN
+            confidence=self.CONFIDENCE_UNKNOWN,
         )
         with self._cache_lock:
             self._cache[char] = result
@@ -138,10 +143,7 @@ class PingZeEngine:
         tone = self._rhyme.get_tone(char, self._default_book)
         if tone is not None:
             return PingZeResult(
-                char=char,
-                pingze=tone,
-                method="rhymebook",
-                confidence=self.CONFIDENCE_RHYMEBOOK
+                char=char, pingze=tone, method="rhymebook", confidence=self.CONFIDENCE_RHYMEBOOK
             )
         return None
 
@@ -152,7 +154,7 @@ class PingZeEngine:
                 char=char,
                 pingze=PingZeValue.ZE,
                 method="rusheng",
-                confidence=self.CONFIDENCE_RUSHENG
+                confidence=self.CONFIDENCE_RUSHENG,
             )
         return None
 
@@ -167,10 +169,7 @@ class PingZeEngine:
                 # 1、2声为平，3、4声为仄
                 pingze = PingZeValue.PING if tone_num in (1, 2) else PingZeValue.ZE
                 return PingZeResult(
-                    char=char,
-                    pingze=pingze,
-                    method="pypinyin",
-                    confidence=self.CONFIDENCE_PYPINYIN
+                    char=char, pingze=pingze, method="pypinyin", confidence=self.CONFIDENCE_PYPINYIN
                 )
         except ImportError:
             pass

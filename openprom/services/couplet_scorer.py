@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CoupletScore:
     """Complete couplet scoring result."""
+
     upper: str
     lower: str
     formal_score: float = 0.0
@@ -79,8 +80,11 @@ class CoupletScorer:
                 "fallback": True,
             }
 
-    def _second_call(self, upper: str, lower: str, special_attention: Dict[str, Any]) -> Dict[str, Any]:
+    def _second_call(
+        self, upper: str, lower: str, special_attention: Dict[str, Any]
+    ) -> Dict[str, Any]:
         import json
+
         prompt_template = self._prompt_service.get_prompt("second_api_call")
         key_insights = json.dumps(special_attention, ensure_ascii=False)[:300]
         prompt = prompt_template.render(upper=upper, lower=lower, key_insights=key_insights)
@@ -121,11 +125,14 @@ class CoupletScorer:
         result.formal_score = formal_score
         result.pingze_score = pingze_score
         result.warnings = warnings
-        trace.add_step("formal_analysis", {
-            "formal_score": formal_score,
-            "pingze_score": pingze_score,
-            "warnings_count": len(warnings),
-        })
+        trace.add_step(
+            "formal_analysis",
+            {
+                "formal_score": formal_score,
+                "pingze_score": pingze_score,
+                "warnings_count": len(warnings),
+            },
+        )
 
         if len(upper) != len(lower):
             result.grade = "不合格"
@@ -138,29 +145,41 @@ class CoupletScorer:
             return result
 
         first = self._first_call(upper, lower)
-        result.first_impression_score = normalize_score(first.get("first_impression_score", 0), max_score=100)
+        result.first_impression_score = normalize_score(
+            first.get("first_impression_score", 0), max_score=100
+        )
         result.first_impression_reason = first.get("first_impression_reason", "")
         result.special_attention = first.get("special_attention", {})
-        trace.add_step("llm_call", {
-            "round": 1,
-            "label": "first_impression",
-            "fallback": first.get("fallback", False),
-            "score": result.first_impression_score,
-        })
+        trace.add_step(
+            "llm_call",
+            {
+                "round": 1,
+                "label": "first_impression",
+                "fallback": first.get("fallback", False),
+                "score": result.first_impression_score,
+            },
+        )
 
         second = self._second_call(upper, lower, result.special_attention)
-        result.llm_technique_score = normalize_score(second.get("technique_score", 0), max_score=100)
+        result.llm_technique_score = normalize_score(
+            second.get("technique_score", 0), max_score=100
+        )
+        # second_api_call v4.0.0 prompt 返回顶层 technique_comment / rhetoric_comment；
+        # 同时保留对早期 technique_evaluation 嵌套 schema 的兼容。
         result.llm_technique_evaluation = second.get("technique_evaluation", {})
         result.llm_rhetoric_score = normalize_score(second.get("rhetoric_score", 0), max_score=100)
         result.llm_rhetoric_evaluation = second.get("rhetoric_evaluation", {})
         result.word_analysis = second.get("word_analysis", [])
-        trace.add_step("llm_call", {
-            "round": 2,
-            "label": "technique_rhetoric",
-            "fallback": second.get("fallback", False),
-            "technique_score": result.llm_technique_score,
-            "rhetoric_score": result.llm_rhetoric_score,
-        })
+        trace.add_step(
+            "llm_call",
+            {
+                "round": 2,
+                "label": "technique_rhetoric",
+                "fallback": second.get("fallback", False),
+                "technique_score": result.llm_technique_score,
+                "rhetoric_score": result.llm_rhetoric_score,
+            },
+        )
 
         # Saddle engineering quality control
         nlp_features = {
@@ -177,16 +196,33 @@ class CoupletScorer:
             llm_parsed_result=second,
             meter_analysis=meter_analysis,
         )
-        trace.add_step("saddle_check", {
-            "applied": saddle_ctx.final_score != result.llm_technique_score * 100,
-            "violations": len(saddle_ctx.validation_results),
-        }, duration_ms=(time.time() - saddle_t0) * 1000)
 
-        corrected_llm_score = saddle_ctx.llm_parsed_result.get("score", result.llm_technique_score)
-        result.saddle_applied = saddle_ctx.final_score != result.llm_technique_score * 100
-        result.nlp_correction_applied = saddle_ctx.llm_parsed_result.get("_nlp_correction_applied", False)
+        # Saddle 工程质量校验：final_score 基于 technique_score（0-100），
+        # 若 NLP 融合或格律扣分被触发，final_score 会与原始 technique_score 不同。
+        original_technique_pct = result.llm_technique_score * 100
+        trace.add_step(
+            "saddle_check",
+            {
+                "applied": saddle_ctx.final_score != original_technique_pct,
+                "violations": len(saddle_ctx.validation_results),
+            },
+            duration_ms=(time.time() - saddle_t0) * 1000,
+        )
 
-        technique_score = corrected_llm_score if result.saddle_applied else result.llm_technique_score
+        # Saddle 修正后的主分数（0-100）。final_score 为 0 表示 Saddle 未命中主分数键
+        # 或严格模式拒绝；此时回退到原始 LLM 技法分，避免误判为"已修正"。
+        if saddle_ctx.final_score > 0:
+            corrected_llm_score = saddle_ctx.final_score / 100.0
+        else:
+            corrected_llm_score = result.llm_technique_score
+        result.saddle_applied = abs(saddle_ctx.final_score - original_technique_pct) > 1e-6
+        result.nlp_correction_applied = saddle_ctx.llm_parsed_result.get(
+            "_nlp_correction_applied", False
+        )
+
+        technique_score = (
+            corrected_llm_score if result.saddle_applied else result.llm_technique_score
+        )
         scores = [technique_score, result.llm_rhetoric_score]
         weights = [
             self._technique_weights.get("llm_technique", 0.50),
@@ -198,34 +234,47 @@ class CoupletScorer:
         result.impression_score = result.first_impression_score
 
         total = (
-            self._total_weights["formal"] * result.formal_score +
-            self._total_weights["technique"] * result.technique_score +
-            self._total_weights["artistic"] * result.artistic_score +
-            self._total_weights["impression"] * result.impression_score
+            self._total_weights["formal"] * result.formal_score
+            + self._total_weights["technique"] * result.technique_score
+            + self._total_weights["artistic"] * result.artistic_score
+            + self._total_weights["impression"] * result.impression_score
         )
         result.total_score = round(total * 100, 1)
         result.total_score = max(0.0, min(100.0, result.total_score))
         result.grade = self._determine_grade(result.total_score)
 
         result.comments = {
-            "technique_comment": result.llm_technique_evaluation.get("overall_technique_comment", ""),
-            "artistic_comment": result.llm_rhetoric_evaluation.get("overall_rhetoric_comment", ""),
+            "technique_comment": (
+                second.get("technique_comment")
+                or result.llm_technique_evaluation.get("overall_technique_comment", "")
+                or ""
+            ),
+            "artistic_comment": (
+                second.get("rhetoric_comment")
+                or result.llm_rhetoric_evaluation.get("overall_rhetoric_comment", "")
+                or ""
+            ),
             "impression_comment": result.first_impression_reason,
             "overall_comment": generate_overall_comment(
                 result.formal_score, result.technique_score, result.artistic_score
             ),
         }
 
-        trace.add_step("result", {
-            "total_score": result.total_score,
-            "grade": result.grade,
-            "saddle_applied": result.saddle_applied,
-        })
+        trace.add_step(
+            "result",
+            {
+                "total_score": result.total_score,
+                "grade": result.grade,
+                "saddle_applied": result.saddle_applied,
+            },
+        )
         trace.success = True
         trace.finished_at = time.time()
         self._persist_trace(trace)
 
-        logger.info(f"Couplet scored | total={result.total_score} | grade={result.grade} | saddle={result.saddle_applied}")
+        logger.info(
+            f"Couplet scored | total={result.total_score} | grade={result.grade} | saddle={result.saddle_applied}"
+        )
 
         # Wire feedback ingestion: high-scoring couplets → knowledge base
         self._try_feedback_ingest(upper, lower, result.total_score)
@@ -237,6 +286,7 @@ class CoupletScorer:
         """Best-effort trace persistence."""
         try:
             from openprom.infrastructure.task_trace import get_task_trace_store
+
             get_task_trace_store().save(trace)
         except Exception as e:
             logger.debug(f"Trace persistence skipped: {e}")
@@ -245,6 +295,7 @@ class CoupletScorer:
         """Non-blocking attempt to ingest high-scoring couplet into knowledge base."""
         try:
             from openprom.infrastructure.config.settings import get_settings
+
             settings = get_settings()
             features = getattr(settings, "features", None)
             knowledge = getattr(settings, "knowledge", None)
@@ -253,6 +304,7 @@ class CoupletScorer:
             if not (knowledge and getattr(knowledge, "enabled", False)):
                 return
             from openprom.knowledge.memory.feedback import get_feedback_ingestor
+
             ingestor = get_feedback_ingestor()
             content = f"{upper}\n{lower}"
             ingestor.ingest(content=content, score=score, meter_type="couplet")
@@ -269,6 +321,7 @@ class CoupletScorer:
     @staticmethod
     def _compute_nlp_features(upper: str, lower: str) -> float:
         from openprom.engines.pingze import get_sequence
+
         try:
             u_tones = get_sequence(upper)
             l_tones = get_sequence(lower)

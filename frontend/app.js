@@ -1,77 +1,66 @@
 /**
- * OpenPROM - 诗词 AI 助手前端
- * 模块化架构：State / API / UI / Animations / History / Tabs / Generation
+ * OpenPROM · 墨印 Concrete Ink · 前端逻辑
+ * 模块：State / DOM / Session / API / UI / Tabs / Animate / History / Theme / Actions
+ * SSE 全事件：thinking / tool_call / tool_result / done / final / error / start / result
  */
 
-const API_BASE_URL = window.location.origin;
-
 const ERROR_MESSAGES = {
-  'COUPLET_001': { msg: '上下联字数不等，请检查后再试' },
-  'COUPLET_002': { msg: '输入包含非中文字符，仅支持中文对联' },
-  'LLM_001': { msg: '服务暂时繁忙，请稍后重试' },
-  'LLM_002': { msg: '结果解析异常，请重试' },
-  'QC_001': { msg: '此联存在严重格律问题，建议修改' },
-  'SYS_001': { msg: '系统内部错误，请稍后重试' },
-  'METER_001': { msg: '格律未通过，请检查输入' },
+  'COUPLET_001': '上下联字数不等，请检查后再试',
+  'COUPLET_002': '输入包含非中文字符，仅支持中文对联',
+  'LLM_001': '服务暂时繁忙，请稍后重试',
+  'LLM_002': '结果解析异常，请重试',
+  'QC_001': '此联存在严重格律问题，建议修改',
+  'SYS_001': '系统内部错误，请稍后重试',
+  'METER_001': '格律未通过，请检查输入',
 };
 
 const EXAMPLES = [
   { upper: '春风化雨润桃李', lower: '秋月凝霜照桂兰' },
   { upper: '书山有路勤为径', lower: '学海无涯苦作舟' },
-  { upper: '天增岁月人增寿', lower: '春满乾坤福满门' }
+  { upper: '天增岁月人增寿', lower: '春满乾坤福满门' },
 ];
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
 /* ========== State ========== */
 const State = {
-  current: 'idle',
+  cur: 'idle',
   result: null,
   history: [],
   activeTab: 'score',
-
-  set(newState, data = null) {
-    this.current = newState;
-    if (data) this.result = data;
-    UI.updateVisibility();
-  }
+  set(s, data = null) { this.cur = s; if (data) this.result = data; UI.syncVisibility(); },
 };
 
-/* ========== DOM refs ========== */
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
-
-const DOM = {
-  upper: $('#upper'), lower: $('#lower'),
-  analyzeBtn: $('#analyzeBtn'), fillExampleBtn: $('#fillExampleBtn'),
-  newAnalysisBtn: $('#newAnalysisBtn'), shareBtn: $('#shareBtn'), saveBtn: $('#saveBtn'),
-  inputSection: $('#inputSection'), loadingSection: $('#loadingSection'), resultSection: $('#resultSection'),
-  totalScore: $('#totalScore'), gradeBadge: $('#gradeBadge'), scoreSummary: $('#scoreSummary'),
-  resultUpper: $('#resultUpper'), resultLower: $('#resultLower'),
-  formalScore: $('#formalScore'), techniqueScore: $('#techniqueScore'), artisticScore: $('#artisticScore'), impressionScore: $('#impressionScore'),
-  formalBar: $('#formalBar'), techniqueBar: $('#techniqueBar'), artisticBar: $('#artisticBar'), impressionBar: $('#impressionBar'),
-  pingzeScore: $('#pingzeScore'), semanticScore: $('#semanticScore'),
-  impressionReason: $('#impressionReason'), techniqueComment: $('#techniqueComment'), artisticComment: $('#artisticComment'),
-  warningsCard: $('#warningsCard'), warningsList: $('#warningsList'),
-  wordAnalysisCard: $('#wordAnalysisCard'), wordAnalysisPanel: $('#wordAnalysisPanel'),
-  loadingSubtitle: $('#loadingSubtitle'), progressFill: $('#progressFill'),
-  toast: $('#toast'), toastIcon: $('#toastIcon'), toastMessage: $('#toastMessage'),
-  themeToggle: $('#themeToggle'), upperCount: $('#upperCount'), lowerCount: $('#lowerCount'), matchIndicator: $('#matchIndicator'),
-  historyList: $('#historyList'), historyEmpty: $('#historyEmpty'), clearHistoryBtn: $('#clearHistoryBtn'),
-  tabNav: $('#tabNav'),
-  meterText: $('#meterText'), meterType: $('#meterType'), meterPattern: $('#meterPattern'), meterBtn: $('#meterBtn'),
-  meterOutput: $('#meterOutput'), meterOutputContent: $('#meterOutputContent'),
-};
+/* ========== DOM ========== */
+const DOM = {};
+function cacheDOM() {
+  [
+    'upper','lower','analyzeBtn','fillExampleBtn','newAnalysisBtn','shareBtn','saveBtn',
+    'scoreInput','scoreLoading','scoreResult','totalScore','gradeBadge','scoreSummary',
+    'resultUpper','resultLower','formalScore','techniqueScore','artisticScore','impressionScore',
+    'formalBar','techniqueBar','artisticBar','impressionBar','pingzeScore','semanticScore','saddleTag',
+    'techniqueComment','artisticComment','impressionReason','warningsCard','warningsList',
+    'wordAnalysisCard','wordAnalysisPanel','loadingSub','scoreRing',
+    'toast','toastSeal','toastMessage','themeToggle','upperCount','lowerCount','matchIndicator',
+    'historyList','historyEmpty','clearHistoryBtn','tabNav',
+    'meterText','meterType','meterPattern','meterPatternList','meterBtn','meterOutput','meterComplianceTag','meterBody',
+    'knowledgeQuery','knowledgeTaskType','knowledgeTopK','knowledgeBtn','knowledgeOutput','knowledgeMeta','knowledgeList',
+    'traceList','traceEmpty','refreshTracesBtn',
+  ].forEach(id => { DOM[id] = document.getElementById(id); });
+}
 
 /* ========== Session ========== */
 const Session = {
   KEY: 'openprom-session-id',
-  getId() {
+  get() {
     let id = localStorage.getItem(this.KEY);
     if (!id) {
       id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       localStorage.setItem(this.KEY, id);
     }
     return id;
-  }
+  },
 };
 
 /* ========== API ========== */
@@ -79,28 +68,27 @@ const API = {
   async analyze(upper, lower) {
     const resp = await fetch('/api/v1/couplet/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Session-ID': Session.getId() },
-      body: JSON.stringify({ upper, lower, stream: false })
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': Session.get() },
+      body: JSON.stringify({ upper, lower, stream: false }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      const errorCode = err.error_code;
-      const mapped = ERROR_MESSAGES[errorCode];
-      if (mapped) throw new Error(mapped.msg);
-      throw new Error(err.detail || `请求失败 (${resp.status})`);
+      const mapped = ERROR_MESSAGES[err.error_code];
+      throw new Error(mapped || err.detail || `请求失败 (${resp.status})`);
     }
     return resp.json();
   },
 
-  async *streamGenerate(endpoint, body) {
+  async *stream(endpoint, body) {
     const resp = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': Session.get() },
       body: JSON.stringify({ ...body, stream: true }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.detail || `请求失败 (${resp.status})`);
+      const mapped = ERROR_MESSAGES[err.error_code];
+      throw new Error(mapped || err.detail || `请求失败 (${resp.status})`);
     }
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
@@ -109,14 +97,17 @@ const API = {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data: ')) continue;
-        const jsonStr = trimmed.slice(6).trim();
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data: ')) {
+          if (line.startsWith(':')) continue;
+          continue;
+        }
+        const jsonStr = line.slice(6).trim();
         if (jsonStr === '[DONE]') return;
-        try { yield JSON.parse(jsonStr); } catch { /* ignore malformed lines */ }
+        try { yield JSON.parse(jsonStr); } catch { /* ignore */ }
       }
     }
   },
@@ -132,124 +123,137 @@ const API = {
       throw new Error(err.detail || `请求失败 (${resp.status})`);
     }
     return resp.json();
-  }
-};
+  },
 
+  async knowledgeSearch(query, topK, taskType) {
+    const body = { query, top_k: topK };
+    if (taskType) body.task_type = taskType;
+    const resp = await fetch('/api/v1/knowledge/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `请求失败 (${resp.status})`);
+    }
+    return resp.json();
+  },
+
+  async listTraces(limit = 20) {
+    const resp = await fetch(`/api/v1/tasks/traces?limit=${limit}`);
+    if (!resp.ok) throw new Error(`请求失败 (${resp.status})`);
+    return resp.json();
+  },
+};
 /* ========== UI ========== */
 const UI = {
   init() {
-    this.bindEvents();
-    this.loadTheme();
+    cacheDOM();
+    this.bind();
+    Theme.load();
     History.load();
-    this.updateVisibility();
+    this.syncVisibility();
     Tabs.init();
+    const savedTab = localStorage.getItem('openprom-active-tab');
+    if (savedTab) Tabs.switch(savedTab);
+    Actions.loadMeterPatterns();
   },
 
-  bindEvents() {
-    DOM.analyzeBtn.addEventListener('click', () => Actions.handleAnalyze());
+  bind() {
+    DOM.analyzeBtn.addEventListener('click', () => Actions.analyze());
     DOM.newAnalysisBtn.addEventListener('click', () => Actions.reset());
-    DOM.shareBtn.addEventListener('click', () => Actions.handleShare());
-    DOM.saveBtn.addEventListener('click', () => Actions.handleSave());
+    DOM.shareBtn.addEventListener('click', () => Actions.share());
+    DOM.saveBtn.addEventListener('click', () => Actions.save());
     DOM.fillExampleBtn.addEventListener('click', () => Actions.fillExample());
     DOM.clearHistoryBtn.addEventListener('click', () => History.clear());
     DOM.themeToggle.addEventListener('click', () => Theme.toggle());
-    DOM.meterBtn.addEventListener('click', () => Actions.handleMeterCheck());
+    DOM.meterBtn.addEventListener('click', () => Actions.meterCheck());
+    DOM.meterType.addEventListener('change', () => Actions.loadMeterPatterns());
+    DOM.knowledgeBtn.addEventListener('click', () => Actions.knowledgeSearch());
+    DOM.refreshTracesBtn.addEventListener('click', () => Actions.loadTraces());
 
     [DOM.upper, DOM.lower].forEach(el => {
       el.addEventListener('input', () => this.updateInputMeta());
-      el.addEventListener('keydown', (e) => {
+      el.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           if (el === DOM.upper) DOM.lower.focus();
-          else Actions.handleAnalyze();
+          else Actions.analyze();
         }
       });
     });
 
-    // Generation buttons
-    $$('.gen-container').forEach(container => {
-      const btn = container.querySelector('.gen-run');
+    $$('.gen-stage').forEach(stage => {
+      const btn = stage.querySelector('.gen-run');
       if (!btn) return;
       btn.addEventListener('click', () => {
-        const type = container.dataset.type;
-        const mode = container.dataset.mode;
-        Actions.handleGenerate(container, type, mode);
+        Actions.generate(stage, stage.dataset.type, stage.dataset.mode);
       });
     });
   },
 
-  updateVisibility() {
-    DOM.inputSection.classList.toggle('hidden', State.current === 'loading');
-    DOM.loadingSection.classList.toggle('hidden', State.current !== 'loading');
-    DOM.resultSection.classList.toggle('hidden', State.current !== 'success' && State.current !== 'error');
+  syncVisibility() {
+    DOM.scoreInput.classList.toggle('hidden', State.cur === 'loading');
+    DOM.scoreLoading.classList.toggle('hidden', State.cur !== 'loading');
+    DOM.scoreResult.classList.toggle('hidden', State.cur !== 'success' && State.cur !== 'error');
   },
 
   updateInputMeta() {
-    const uLen = DOM.upper.value.length;
-    const lLen = DOM.lower.value.length;
-    DOM.upperCount.textContent = `${uLen} 字`;
-    DOM.lowerCount.textContent = `${lLen} 字`;
-
-    if (uLen > 0 || lLen > 0) {
-      if (uLen === lLen) {
+    const u = DOM.upper.value.length, l = DOM.lower.value.length;
+    DOM.upperCount.textContent = `${u} 字`;
+    DOM.lowerCount.textContent = `${l} 字`;
+    if (u > 0 || l > 0) {
+      if (u === l) {
         DOM.matchIndicator.textContent = '✓ 字数匹配';
-        DOM.matchIndicator.className = 'match-indicator match';
+        DOM.matchIndicator.className = 'match-ind match';
       } else {
-        DOM.matchIndicator.textContent = `✗ 差 ${Math.abs(uLen - lLen)} 字`;
-        DOM.matchIndicator.className = 'match-indicator mismatch';
+        DOM.matchIndicator.textContent = `✗ 差 ${Math.abs(u - l)} 字`;
+        DOM.matchIndicator.className = 'match-ind mismatch';
       }
     } else {
       DOM.matchIndicator.textContent = '';
-      DOM.matchIndicator.className = 'match-indicator';
+      DOM.matchIndicator.className = 'match-ind';
     }
   },
 
   showLoading() {
     State.set('loading');
-    this.setLoadingStep(0);
-    DOM.loadingSubtitle.textContent = '准备分析...';
-    DOM.progressFill.style.width = '0%';
+    this.setLoadStep(0);
+    DOM.loadingSub.textContent = '准备分析…';
   },
 
-  setLoadingStep(step) {
-    const steps = $$('.progress-step');
-    const labels = ['形式检测中...', '技法分析中...', '艺术评鉴中...', '总评生成中...'];
-    steps.forEach((s, i) => {
-      s.classList.remove('active', 'completed');
-      if (i < step) s.classList.add('completed');
-      else if (i === step) s.classList.add('active');
+  setLoadStep(step) {
+    const rows = $$('.bar-row');
+    const labels = ['形式分析中…', '技法评判中…', '艺术赏析中…', '马鞍校准中…'];
+    rows.forEach((r, i) => {
+      r.classList.remove('active', 'done');
+      if (i < step) r.classList.add('done');
+      else if (i === step) r.classList.add('active');
     });
-    if (step < labels.length) DOM.loadingSubtitle.textContent = labels[step];
-    DOM.progressFill.style.width = `${(step / 3) * 100}%`;
-  },
-
-  hideLoading() {
-    DOM.loadingSection.classList.add('hidden');
+    if (step < labels.length) DOM.loadingSub.textContent = labels[step];
   },
 
   showResult(data) {
     State.set('success', data);
-    Animations.animateNumber(DOM.totalScore, data.total_score, 1200);
-    Animations.animateScoreCircle(data.total_score);
-
+    Animate.number(DOM.totalScore, data.total_score, 1200);
+    Animate.ring(data.total_score);
     DOM.gradeBadge.textContent = data.grade;
-    DOM.scoreSummary.textContent = this.getGradeSummary(data.grade, data.total_score);
-
+    DOM.scoreSummary.textContent = this.gradeSummary(data.grade);
     DOM.resultUpper.textContent = data.upper;
     DOM.resultLower.textContent = data.lower;
+    this.updateDim('formal', data.formal_score);
+    this.updateDim('technique', data.technique_score);
+    this.updateDim('artistic', data.artistic_score);
+    this.updateDim('impression', data.impression_score);
+    DOM.pingzeScore.textContent = Math.round((data.pingze_score || 0) * 100);
+    DOM.semanticScore.textContent = data.detail?.word_analysis?.length ? '已分析' : '—';
+    DOM.saddleTag.textContent = data.saddle_applied ? '已校准' : '原值';
+    DOM.techniqueComment.textContent = data.comments?.technique_comment || '暂无点评';
+    DOM.artisticComment.textContent = data.comments?.artistic_comment || '暂无赏析';
+    DOM.impressionReason.textContent = data.comments?.impression_comment || '暂无印象';
 
-    this.updateDimension('formal', data.formal_score);
-    this.updateDimension('technique', data.technique_score);
-    this.updateDimension('artistic', data.artistic_score);
-    this.updateDimension('impression', data.impression_score);
-
-    DOM.pingzeScore.textContent = (data.pingze_score * 100).toFixed(0);
-
-    DOM.impressionReason.textContent = data.comments?.impression_comment || '暂无 AI 印象';
-    DOM.techniqueComment.textContent = data.comments?.technique_comment || '暂无技法点评';
-    DOM.artisticComment.textContent = data.comments?.artistic_comment || '暂无艺术赏析';
-
-    if (data.warnings && data.warnings.length > 0) {
+    if (data.warnings && data.warnings.length) {
       DOM.warningsCard.classList.remove('hidden');
       DOM.warningsList.innerHTML = '';
       data.warnings.forEach(w => {
@@ -261,270 +265,427 @@ const UI = {
       DOM.warningsCard.classList.add('hidden');
     }
 
-    if (data.detail && data.detail.word_analysis && data.detail.word_analysis.length > 0) {
+    if (data.detail?.word_analysis?.length) {
       DOM.wordAnalysisCard.classList.remove('hidden');
-      DOM.wordAnalysisPanel.innerHTML = '';
-      const table = document.createElement('table');
-      table.className = 'word-analysis-table';
-      const thead = document.createElement('thead');
-      thead.innerHTML = '<tr><th>位置</th><th>上联</th><th>下联</th><th>词性</th><th>平仄</th></tr>';
-      table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      data.detail.word_analysis.forEach(wa => {
-        const tr = document.createElement('tr');
-        const posMatch = wa.pos_match ? '✓' : '✗';
-        const toneMatch = wa.tone_match ? '✓' : '✗';
-        tr.innerHTML = `<td>${wa.position + 1}</td><td>${wa.upper_char}</td><td>${wa.lower_char}</td><td>${posMatch}</td><td>${toneMatch}</td>`;
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      DOM.wordAnalysisPanel.appendChild(table);
+      this.renderWordTable(data.detail.word_analysis);
     } else {
       DOM.wordAnalysisCard.classList.add('hidden');
     }
 
-    setTimeout(() => DOM.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    setTimeout(() => DOM.scoreResult.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
   },
 
-  updateDimension(type, score) {
-    const scoreEl = DOM[`${type}Score`];
-    const barEl = DOM[`${type}Bar`];
-    if (scoreEl) Animations.animateNumber(scoreEl, score, 1000);
-    if (barEl) setTimeout(() => { barEl.style.width = `${Math.min(score, 100)}%`; }, 300);
+  renderWordTable(wa) {
+    DOM.wordAnalysisPanel.innerHTML = '';
+    const tbl = document.createElement('table');
+    tbl.className = 'word-table';
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>位</th><th>上联</th><th>下联</th><th>词性</th><th>平仄</th></tr>';
+    tbl.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    wa.forEach(w => {
+      const tr = document.createElement('tr');
+      const posCls = w.pos_match ? 'pos-ok' : 'pos-bad';
+      const posMark = w.pos_match ? '✓' : '✗';
+      const toneMark = w.tone_match === null || w.tone_match === undefined ? '—' : (w.tone_match ? '✓' : '✗');
+      const toneCls = w.tone_match ? 'pos-ok' : 'pos-bad';
+      tr.innerHTML = `<td>${w.position + 1}</td><td>${w.upper_char}</td><td>${w.lower_char}</td><td class="${posCls}">${posMark}</td><td class="${toneCls}">${toneMark}</td>`;
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    DOM.wordAnalysisPanel.appendChild(tbl);
   },
 
-  getGradeSummary(grade, score) {
-    const map = {
-      '优秀': '意境深远，对仗精妙',
-      '良好': '整体协调，略有可提升之处',
-      '及格': '基本合规，技法有待加强',
-      '不合格': '形式或内容需大幅调整'
-    };
-    return map[grade] || '';
+  updateDim(type, score) {
+    const sEl = DOM[`${type}Score`], bEl = DOM[`${type}Bar`];
+    if (sEl) Animate.number(sEl, score, 1000);
+    if (bEl) setTimeout(() => { bEl.style.width = `${Math.min(score, 100)}%`; }, 300);
+  },
+
+  gradeSummary(grade) {
+    return { '优秀': '意境深远，对仗精妙', '良好': '整体协调，略有可提升', '及格': '基本合规，技法待加强', '不合格': '形式或内容需调整' }[grade] || '——';
   },
 
   showError(msg) {
-    this.showToast(msg, 'error');
+    this.toast(msg, 'error');
     State.set('error');
-    this.updateVisibility();
+    this.syncVisibility();
   },
 
-  showToast(msg, type = 'info') {
-    const icons = { info: 'ℹ', success: '✓', error: '✕', warning: '!' };
-    DOM.toastIcon.textContent = icons[type] || icons.info;
+  toast(msg, type = 'info') {
+    DOM.toast.className = `toast ${type}`;
+    const seals = { info: '·', success: '✓', error: '✕', warning: '!' };
+    DOM.toastSeal.textContent = seals[type] || '·';
     DOM.toastMessage.textContent = msg;
     DOM.toast.classList.add('show');
-    clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => DOM.toast.classList.remove('show'), 3500);
+    clearTimeout(this._tt);
+    this._tt = setTimeout(() => DOM.toast.classList.remove('show'), 3500);
   },
-
-  loadTheme() {
-    const saved = localStorage.getItem('openprom-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', theme);
-  }
 };
 
 /* ========== Tabs ========== */
 const Tabs = {
   init() {
-    $$('.tab-button').forEach(btn => {
-      btn.addEventListener('click', () => this.switchTo(btn.dataset.tab));
-    });
+    $$('.tab').forEach(b => b.addEventListener('click', () => this.switch(b.dataset.tab)));
   },
-
-  switchTo(tab) {
+  switch(tab) {
     State.activeTab = tab;
-    $$('.tab-button').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-    $$('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${tab}`));
+    $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
     localStorage.setItem('openprom-active-tab', tab);
-  }
+    if (tab === 'tasks') Actions.loadTraces();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },
 };
 
-/* ========== Animations ========== */
-const Animations = {
-  animateNumber(el, target, duration = 1000) {
+/* ========== Animate ========== */
+const Animate = {
+  number(el, target, dur = 1000) {
     const start = performance.now();
     const from = parseFloat(el.textContent) || 0;
     const diff = target - from;
     function tick(now) {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 4);
-      el.textContent = Math.round(from + diff * ease);
-      if (progress < 1) requestAnimationFrame(tick);
+      const p = Math.min((now - start) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 4);
+      el.textContent = Math.round(from + diff * e);
+      if (p < 1) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
   },
-
-  animateScoreCircle(score) {
-    const circumference = 2 * Math.PI * 62;
-    const offset = circumference - (score / 100) * circumference;
-    const el = $('.score-progress');
+  ring(score) {
+    const r = 70;
+    const c = 2 * Math.PI * r;
+    const off = c - (score / 100) * c;
+    const el = $('.ring-fg');
     if (el) {
-      el.style.strokeDasharray = circumference;
-      setTimeout(() => { el.style.strokeDashoffset = offset; }, 300);
+      el.style.strokeDasharray = c;
+      setTimeout(() => { el.style.strokeDashoffset = off; }, 300);
     }
-  }
+  },
 };
 
 /* ========== History ========== */
 const History = {
-  KEY: 'openprom-history',
-  MAX: 50,
-
+  KEY: 'openprom-history', MAX: 50,
   load() {
-    try {
-      const raw = localStorage.getItem(this.KEY);
-      State.history = raw ? JSON.parse(raw) : [];
-    } catch { State.history = []; }
+    try { State.history = JSON.parse(localStorage.getItem(this.KEY)) || []; } catch { State.history = []; }
     this.render();
   },
-
-  save() {
-    localStorage.setItem(this.KEY, JSON.stringify(State.history));
-    this.render();
-  },
-
-  add(item) {
-    State.history.unshift(item);
-    if (State.history.length > this.MAX) State.history.pop();
-    this.save();
-  },
-
+  save() { localStorage.setItem(this.KEY, JSON.stringify(State.history)); this.render(); },
+  add(item) { State.history.unshift(item); if (State.history.length > this.MAX) State.history.pop(); this.save(); },
   clear() {
     if (!State.history.length) return;
-    if (!confirm('确定要清空所有评鉴历史吗？')) return;
+    if (!confirm('确定清空所有评鉴记录？')) return;
     State.history = [];
     this.save();
-    UI.showToast('历史记录已清空', 'success');
+    UI.toast('历史已清空', 'success');
   },
-
   render() {
     if (!State.history.length) {
       DOM.historyList.innerHTML = '';
-      DOM.historyList.appendChild(DOM.historyEmpty);
-      DOM.historyEmpty.classList.remove('hidden');
+      DOM.historyList.appendChild(DOM.historyEmpty.cloneNode(true));
       return;
     }
-    DOM.historyEmpty.classList.add('hidden');
     DOM.historyList.innerHTML = State.history.map((h, i) => `
-      <div class="history-item" data-index="${i}">
+      <div class="history-item" data-i="${i}">
         <div class="history-item-score">${h.total_score}</div>
         <div class="history-item-content">
-          <div class="history-item-couplet">${h.upper} · ${h.lower}</div>
+          <div class="history-item-couplet">${escapeHtml(h.upper)} · ${escapeHtml(h.lower)}</div>
           <div class="history-item-meta">${h.grade} · ${new Date(h.time).toLocaleString()}</div>
         </div>
         <span class="history-item-grade">${h.grade}</span>
-      </div>
-    `).join('');
-
+      </div>`).join('');
     $$('.history-item').forEach(el => {
       el.addEventListener('click', () => {
-        const idx = parseInt(el.dataset.index);
-        const item = State.history[idx];
-        if (item && item.raw) {
-          UI.showResult(item.raw);
-          DOM.resultSection.scrollIntoView({ behavior: 'smooth' });
-        }
+        const item = State.history[parseInt(el.dataset.i)];
+        if (item?.raw) UI.showResult(item.raw);
       });
     });
-  }
+  },
 };
 
 /* ========== Theme ========== */
 const Theme = {
+  load() {
+    const saved = localStorage.getItem('openprom-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+  },
   toggle() {
-    const html = document.documentElement;
-    const current = html.getAttribute('data-theme') || 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('openprom-theme', next);
-  }
+  },
 };
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 /* ========== Actions ========== */
 const Actions = {
-  async handleAnalyze() {
-    const upper = DOM.upper.value.trim();
-    const lower = DOM.lower.value.trim();
-
-    if (!upper || !lower) { UI.showToast('请输入上联和下联', 'warning'); return; }
-    if (upper.length !== lower.length) { UI.showToast(`字数不等：上联${upper.length}字，下联${lower.length}字`, 'warning'); return; }
-
+  async analyze() {
+    const upper = DOM.upper.value.trim(), lower = DOM.lower.value.trim();
+    if (!upper || !lower) { UI.toast('请输入上联和下联', 'warning'); return; }
+    if (upper.length !== lower.length) { UI.toast(`字数不等：上联${upper.length}字，下联${lower.length}字`, 'warning'); return; }
     UI.showLoading();
-
+    // 前端按时间模拟阶段反馈（后端为单次调用，无流式进度）
+    [600, 1800, 3000].forEach((d, i) => setTimeout(() => UI.setLoadStep(i + 1), d));
     try {
       const result = await API.analyze(upper, lower);
-      UI.setLoadingStep(3);
-      UI.showResult(result);
-      History.add({
-        upper, lower, total_score: result.total_score, grade: result.grade,
-        time: Date.now(), raw: result
-      });
+      UI.setLoadStep(3);
+      setTimeout(() => UI.showResult(result), 300);
+      History.add({ upper, lower, total_score: result.total_score, grade: result.grade, time: Date.now(), raw: result });
     } catch (err) {
       console.error(err);
       UI.showError(`评鉴失败：${err.message}`);
     }
   },
 
-  async handleGenerate(container, type, mode) {
-    const prompt = container.querySelector('.gen-prompt').value.trim();
-    if (!prompt) { UI.showToast('请输入提示内容', 'warning'); return; }
-
-    const output = container.querySelector('.gen-output');
-    const content = container.querySelector('.gen-output-content');
-    const log = container.querySelector('.gen-output-log');
+  async generate(stage, type, mode) {
+    const prompt = stage.querySelector('.gen-prompt').value.trim();
+    if (!prompt) { UI.toast('请输入提示内容', 'warning'); return; }
+    const output = stage.querySelector('.gen-output');
+    const content = stage.querySelector('.gen-output-content');
+    const status = stage.querySelector('.gen-output-status');
+    const logBody = stage.querySelector('.gen-log-body');
     output.classList.remove('hidden');
-    content.textContent = '思考中...';
-    if (log) log.classList.remove('hidden');
-    if (log) log.innerHTML = '';
+    content.textContent = '';
+    status.textContent = '生成中…';
+    status.className = 'gen-output-status active';
+    if (logBody) logBody.innerHTML = '';
 
     const body = { prompt };
     if (type === 'couplet') {
-      body.length = parseInt(container.querySelector('.gen-length').value, 10);
+      body.length = parseInt(stage.querySelector('.gen-length').value, 10);
     } else {
-      body.form = container.querySelector('.gen-form').value;
-      body.tone_preference = container.querySelector('.gen-tone').value || null;
+      body.form = stage.querySelector('.gen-form').value;
+      body.tone_preference = stage.querySelector('.gen-tone').value || null;
     }
-
     const endpoint = `/api/v1/${type}/${mode}`;
     try {
-      for await (const event of API.streamGenerate(endpoint, body)) {
-        if (event.event === 'final') {
-          content.textContent = event.content || '（无输出）';
-        } else if (event.event === 'tool_result' && event.result) {
-          if (log) {
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            div.textContent = `工具 ${event.tool}: ${JSON.stringify(event.result, null, 2)}`;
-            log.appendChild(div);
-          }
-        } else if (event.event === 'error') {
-          content.textContent = `错误：${event.message || '未知错误'}`;
+      for await (const ev of API.stream(endpoint, body)) {
+        if (ev.event === 'thinking') {
+          this.appendLog(logBody, 'thinking', `思考 · 第 ${ev.round || '?'} 轮`);
+        } else if (ev.event === 'tool_call') {
+          this.appendLog(logBody, 'tool', `调用工具 ${ev.tool}(${JSON.stringify(ev.arguments || {})})`);
+        } else if (ev.event === 'tool_result') {
+          this.appendLog(logBody, 'tool', `工具 ${ev.tool} 返回：${JSON.stringify(ev.result || {}).slice(0, 300)}`);
+        } else if (ev.event === 'done') {
+          if (ev.content) content.textContent = ev.content;
+        } else if (ev.event === 'final') {
+          content.textContent = ev.content || '（无输出）';
+          status.textContent = '完成';
+          status.className = 'gen-output-status done';
+        } else if (ev.event === 'start') {
+          // 评鉴流式起点（生成场景不会触发）
+        } else if (ev.event === 'result') {
+          content.textContent = ev.content || JSON.stringify(ev, null, 2);
+          status.textContent = '完成';
+          status.className = 'gen-output-status done';
+        } else if (ev.event === 'error') {
+          content.textContent = `错误：${ev.message || '未知错误'}`;
+          status.textContent = '失败';
+          status.className = 'gen-output-status';
+          this.appendLog(logBody, 'error', ev.message || '未知错误');
           break;
         }
       }
+      if (!content.textContent) content.textContent = '（无输出）';
     } catch (err) {
       console.error(err);
       content.textContent = `请求失败：${err.message}`;
-      UI.showToast(`生成失败：${err.message}`, 'error');
+      status.textContent = '失败';
+      status.className = 'gen-output-status';
+      UI.toast(`生成失败：${err.message}`, 'error');
     }
   },
 
-  async handleMeterCheck() {
-    const text = DOM.meterText.value.trim();
-    if (!text) { UI.showToast('请输入待检测文本', 'warning'); return; }
+  appendLog(body, type, text) {
+    if (!body) return;
+    const div = document.createElement('div');
+    div.className = `log-entry log-entry--${type}`;
+    div.textContent = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  },
 
-    DOM.meterOutput.classList.remove('hidden');
-    DOM.meterOutputContent.textContent = '检测中...';
+  async loadMeterPatterns() {
+    const type = DOM.meterType.value;
+    if (type === 'couplet') {
+      DOM.meterPatternList.innerHTML = '';
+      return;
+    }
     try {
-      const result = await API.meterCheck(text, DOM.meterType.value, DOM.meterPattern.value);
-      DOM.meterOutputContent.textContent = JSON.stringify(result, null, 2);
+      const r = await fetch(`/api/v1/meter/list?meter_type=${encodeURIComponent(type)}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      DOM.meterPatternList.innerHTML = (data.patterns || []).map(p => `<option value="${escapeHtml(p)}">`).join('');
     } catch (err) {
-      DOM.meterOutputContent.textContent = `请求失败：${err.message}`;
-      UI.showToast(`检测失败：${err.message}`, 'error');
+      console.error('加载格律模板失败', err);
+    }
+  },
+
+  async meterCheck() {
+    const text = DOM.meterText.value.trim();
+    if (!text) { UI.toast('请输入待检测文本', 'warning'); return; }
+    DOM.meterOutput.classList.remove('hidden');
+    DOM.meterBody.innerHTML = '<p style="color:var(--text-3);font-size:.9rem;">检测中…</p>';
+    DOM.meterComplianceTag.textContent = '';
+    DOM.meterComplianceTag.className = 'compliance-tag';
+    try {
+      const r = await API.meterCheck(text, DOM.meterType.value, DOM.meterPattern.value);
+      this.renderMeter(r);
+    } catch (err) {
+      DOM.meterBody.innerHTML = `<p style="color:var(--vermilion);">请求失败：${escapeHtml(err.message)}</p>`;
+    }
+  },
+
+  renderMeter(r) {
+    const ok = r.is_compliant;
+    DOM.meterComplianceTag.textContent = ok ? '合规' : '不合规';
+    DOM.meterComplianceTag.className = `compliance-tag ${ok ? 'ok' : 'bad'}`;
+    DOM.meterBody.innerHTML = '';
+
+    // 平仄序列结构化展示
+    if (r.tone_details && r.tone_details.length) {
+      const sec = document.createElement('div');
+      sec.className = 'meter-section';
+      sec.innerHTML = '<h4>平仄逐字</h4>';
+      const lines = document.createElement('div');
+      lines.className = 'meter-pattern';
+      r.tone_details.forEach((line, li) => {
+        const row = document.createElement('div');
+        line.forEach(t => {
+          const sp = document.createElement('span');
+          sp.className = 'meter-char';
+          if (t.tone === 1) sp.classList.add('ping');
+          else if (t.tone === -1) sp.classList.add('ze');
+          else sp.classList.add('zhong');
+          sp.textContent = t.char || '？';
+          if (t.violation) sp.classList.add('bad');
+          row.appendChild(sp);
+        });
+        lines.appendChild(row);
+      });
+      sec.appendChild(lines);
+      DOM.meterBody.appendChild(sec);
+    }
+
+    // 违规列表
+    if (r.violations && r.violations.length) {
+      const sec = document.createElement('div');
+      sec.className = 'meter-section';
+      sec.innerHTML = '<h4>违规项</h4>';
+      const ul = document.createElement('ul');
+      ul.className = 'meter-violations';
+      r.violations.forEach(v => { const li = document.createElement('li'); li.textContent = v; ul.appendChild(li); });
+      sec.appendChild(ul);
+      DOM.meterBody.appendChild(sec);
+    }
+
+    // 匹配格律
+    if (r.matched_meters && r.matched_meters.length) {
+      const sec = document.createElement('div');
+      sec.className = 'meter-section';
+      sec.innerHTML = '<h4>匹配格律</h4>';
+      const list = document.createElement('div');
+      r.matched_meters.forEach(m => {
+        const d = document.createElement('div');
+        d.style.cssText = 'padding:6px 0;border-bottom:1px dashed var(--border-soft);font-size:.88rem;';
+        d.innerHTML = `<b style="color:var(--vermilion);">${escapeHtml(m.name || '')}</b> · 匹配率 ${(m.match_rate * 100 || 0).toFixed(0)}%`;
+        list.appendChild(d);
+      });
+      sec.appendChild(list);
+      DOM.meterBody.appendChild(sec);
+    }
+
+    // 韵字建议
+    if (r.rhyme_suggestions && r.rhyme_suggestions.length) {
+      const sec = document.createElement('div');
+      sec.className = 'meter-section';
+      sec.innerHTML = '<h4>押韵候选</h4>';
+      const d = document.createElement('div');
+      d.className = 'meter-pattern';
+      d.textContent = r.rhyme_suggestions.join(' · ');
+      sec.appendChild(d);
+      DOM.meterBody.appendChild(sec);
+    }
+
+    // 元信息
+    const meta = document.createElement('div');
+    meta.className = 'meter-meta';
+    meta.innerHTML = `
+      <div class="meter-meta-item"><span>类型</span><strong>${escapeHtml(r.meter_type)}</strong></div>
+      <div class="meter-meta-item"><span>合规</span><strong>${ok ? '是' : '否'}</strong></div>`;
+    DOM.meterBody.appendChild(meta);
+  },
+
+  async knowledgeSearch() {
+    const q = DOM.knowledgeQuery.value.trim();
+    if (!q) { UI.toast('请输入检索词', 'warning'); return; }
+    DOM.knowledgeOutput.classList.remove('hidden');
+    DOM.knowledgeList.innerHTML = '<p style="color:var(--text-3);padding:var(--sp-4);">检索中…</p>';
+    DOM.knowledgeMeta.textContent = '';
+    try {
+      const r = await API.knowledgeSearch(q, parseInt(DOM.knowledgeTopK.value, 10), DOM.knowledgeTaskType.value || null);
+      const total = r.total_candidates ?? 0;
+      const cnt = r.results?.length ?? 0;
+      const latency = r.latency_ms ?? '—';
+      const stages = r.pipeline_stages?.join(' → ') || '召回 → 融合 → 重排';
+      DOM.knowledgeMeta.innerHTML = `候选 <b>${total}</b> · 返回 <b>${cnt}</b> · 耗时 <b>${latency}ms</b> · 流水线：${stages}`;
+      if (!r.results.length) {
+        DOM.knowledgeList.innerHTML = '<p style="color:var(--text-3);padding:var(--sp-4);">无匹配结果。知识层可能未启用或语料为空。</p>';
+        return;
+      }
+      DOM.knowledgeList.innerHTML = r.results.map(h => `
+        <article class="knowledge-item">
+          <div class="ki-head">
+            <span class="ki-score">${(h.final_score * 100).toFixed(1)}</span>
+            <span class="ki-type">${escapeHtml(h.chunk_type)}</span>
+          </div>
+          <div class="ki-content">${escapeHtml(h.content)}</div>
+          ${h.annotated ? `<div class="ki-content" style="font-size:.85rem;color:var(--text-2);">${escapeHtml(h.annotated)}</div>` : ''}
+          <div class="ki-prov">
+            ${h.provenance?.title ? `<span>《${escapeHtml(h.provenance.title)}》</span>` : ''}
+            ${h.provenance?.author ? `<span>${escapeHtml(h.provenance.author)}</span>` : ''}
+            ${h.provenance?.dynasty ? `<span>${escapeHtml(h.provenance.dynasty)}</span>` : ''}
+            <span>语义 ${(h.semantic_score * 100).toFixed(0)}%</span>
+            ${h.rerank_score != null ? `<span>重排 ${(h.rerank_score * 100).toFixed(0)}%</span>` : ''}
+          </div>
+        </article>`).join('');
+    } catch (err) {
+      DOM.knowledgeList.innerHTML = `<p style="color:var(--vermilion);padding:var(--sp-4);">检索失败：${escapeHtml(err.message)}</p>`;
+    }
+  },
+
+  async loadTraces() {
+    DOM.traceList.innerHTML = '<p style="color:var(--text-3);padding:var(--sp-4);">加载中…</p>';
+    try {
+      const rows = await API.listTraces(20);
+      if (!rows?.length) {
+        DOM.traceList.innerHTML = '';
+        DOM.traceList.appendChild(DOM.traceEmpty.cloneNode(true));
+        return;
+      }
+      DOM.traceList.innerHTML = rows.map(r => `
+        <div class="trace-item">
+          <div class="trace-head">
+            <span class="trace-name">${escapeHtml(r.task_name)}</span>
+            <span class="trace-status ${r.success ? 'ok' : 'fail'}">${r.success ? '成功' : '失败'}</span>
+          </div>
+          <div class="trace-meta">
+            <span><b>耗时</b> ${r.total_duration_ms.toFixed(0)}ms</span>
+            <span><b>LLM</b> ${r.llm_calls}</span>
+            <span><b>工具</b> ${r.tool_calls}</span>
+            <span><b>RAG</b> ${r.rag_calls}</span>
+            ${r.finished_at ? `<span><b>完成</b> ${escapeHtml(r.finished_at)}</span>` : ''}
+          </div>
+          ${r.error ? `<div style="color:var(--vermilion);font-size:.8rem;margin-top:6px;">${escapeHtml(r.error)}</div>` : ''}
+          <div class="trace-id">${escapeHtml(r.task_id)}</div>
+        </div>`).join('');
+    } catch (err) {
+      DOM.traceList.innerHTML = `<p style="color:var(--vermilion);padding:var(--sp-4);">加载失败：${escapeHtml(err.message)}</p>`;
     }
   },
 
@@ -533,29 +694,23 @@ const Actions = {
     DOM.lower.value = '';
     UI.updateInputMeta();
     State.set('idle');
-    UI.updateVisibility();
-    DOM.inputSection.scrollIntoView({ behavior: 'smooth' });
+    UI.syncVisibility();
+    DOM.scoreInput.scrollIntoView({ behavior: 'smooth' });
   },
 
-  handleShare() {
+  share() {
     const r = State.result;
     if (!r) return;
-    const text = `【PORM对联评鉴】\n上联：${r.upper}\n下联：${r.lower}\n总分：${r.total_score}分（${r.grade}）\n\n来自 OpenPROM 诗词 AI 助手`;
-    if (navigator.share) {
-      navigator.share({ title: '对联评鉴结果', text }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text).then(() => UI.showToast('结果已复制到剪贴板', 'success'));
-    }
+    const text = `【墨印评鉴】\n上联：${r.upper}\n下联：${r.lower}\n总分：${r.total_score}分（${r.grade}）\n\n来自 OpenPROM 墨印诗词 AI`;
+    if (navigator.share) navigator.share({ title: '对联评鉴', text }).catch(() => {});
+    else navigator.clipboard.writeText(text).then(() => UI.toast('已复制到剪贴板', 'success'));
   },
 
-  handleSave() {
+  save() {
     const r = State.result;
     if (!r) return;
-    History.add({
-      upper: r.upper, lower: r.lower, total_score: r.total_score, grade: r.grade,
-      time: Date.now(), raw: r
-    });
-    UI.showToast('已保存到历史记录', 'success');
+    History.add({ upper: r.upper, lower: r.lower, total_score: r.total_score, grade: r.grade, time: Date.now(), raw: r });
+    UI.toast('已保存到轨迹', 'success');
   },
 
   fillExample() {
@@ -563,13 +718,9 @@ const Actions = {
     DOM.upper.value = ex.upper;
     DOM.lower.value = ex.lower;
     UI.updateInputMeta();
-    UI.showToast('已填入示例对联', 'info');
-  }
+    UI.toast('已填入示例', 'info');
+  },
 };
 
 /* ========== Boot ========== */
-document.addEventListener('DOMContentLoaded', () => {
-  UI.init();
-  const savedTab = localStorage.getItem('openprom-active-tab');
-  if (savedTab) Tabs.switchTo(savedTab);
-});
+document.addEventListener('DOMContentLoaded', () => UI.init());

@@ -97,18 +97,14 @@ def build_hermes_tools(retriever: HermesRetriever = None) -> Dict[str, Tool]:
         "retrieve_imagery": Tool(
             name="retrieve_imagery",
             description=(
-                "检索并提取古人诗作中的意象、炼字与典雅表达，"
-                "用于避免现代白话化，提高诗味。"
+                "检索并提取古人诗作中的意象、炼字与典雅表达，用于避免现代白话化，提高诗味。"
             ),
             parameters=_RETRIEVE_IMAGERY_SCHEMA,
             func=lambda **kwargs: imagery.invoke(**kwargs),
         ),
         "retrieve_lines": Tool(
             name="retrieve_lines",
-            description=(
-                "检索与主题相关的古人诗句或对联，"
-                "用于获取韵脚、对仗或意象灵感。"
-            ),
+            description=("检索与主题相关的古人诗句或对联，用于获取韵脚、对仗或意象灵感。"),
             parameters=_RETRIEVE_LINES_SCHEMA,
             func=lambda **kwargs: lines.invoke(**kwargs),
         ),

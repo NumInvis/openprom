@@ -95,7 +95,7 @@ def _normalize_result(content: str) -> str:
     if len(chinese_lines) >= 2:
         for i in range(len(chinese_lines) - 1, 0, -1):
             if len(chinese_lines[i]) == len(chinese_lines[i - 1]) and len(chinese_lines[i]) >= 4:
-                return f"{chinese_lines[i-1]}\n{chinese_lines[i]}"
+                return f"{chinese_lines[i - 1]}\n{chinese_lines[i]}"
         return f"{chinese_lines[-2]}\n{chinese_lines[-1]}"
 
     return text.strip()[-200:]
@@ -105,6 +105,7 @@ def _persist_trace(trace) -> None:
     """Best-effort trace persistence."""
     try:
         from openprom.infrastructure.task_trace import get_task_trace_store
+
         get_task_trace_store().save(trace)
     except Exception as e:
         logger.debug("Trace persistence skipped: %s", e)
@@ -163,16 +164,24 @@ class CoupletGenerator:
         )
 
         content = result.get("content", "")
-        trace.add_step("llm_call", {
-            "phase": "inspire",
-            "content_preview": content[:200],
-        })
+        trace.add_step(
+            "llm_call",
+            {
+                "phase": "inspire",
+                "content_preview": content[:200],
+            },
+        )
         return content
 
     # -- Phase 2: Create -------------------------------------------------
 
     def _phase_create(
-        self, theme: str, mode: str, length: int, inspiration: str, trace,
+        self,
+        theme: str,
+        mode: str,
+        length: int,
+        inspiration: str,
+        trace,
     ) -> str:
         """Single LLM call — free creation with meter context injected."""
         meter_ctx = _get_meter_context(length)
@@ -199,11 +208,14 @@ class CoupletGenerator:
         )
 
         content = result.get("content", "")
-        trace.add_step("llm_call", {
-            "phase": "create",
-            "temperature": 0.9,
-            "content_preview": content[:200],
-        })
+        trace.add_step(
+            "llm_call",
+            {
+                "phase": "create",
+                "temperature": 0.9,
+                "content_preview": content[:200],
+            },
+        )
         return content
 
     # -- Phase 3: Refine -------------------------------------------------
@@ -245,11 +257,14 @@ class CoupletGenerator:
                 temperature=0.3,
             )
             draft = result.get("content", draft)
-            trace.add_step("llm_call", {
-                "phase": "refine",
-                "round": round_idx + 1,
-                "fixes_applied": len(fixes),
-            })
+            trace.add_step(
+                "llm_call",
+                {
+                    "phase": "refine",
+                    "round": round_idx + 1,
+                    "fixes_applied": len(fixes),
+                },
+            )
 
         return draft
 

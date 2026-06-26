@@ -68,35 +68,41 @@ class PoetryIndexer:
         poem_id = str(record["id"])
 
         # Whole poem
-        chunks.append({
-            "id": poem_id,
-            **base_meta,
-            "text": "\n".join(lines),
-            "chunk_type": "poem",
-        })
+        chunks.append(
+            {
+                "id": poem_id,
+                **base_meta,
+                "text": "\n".join(lines),
+                "chunk_type": "poem",
+            }
+        )
 
         # Couplets (pairs of lines)
         for i in range(0, len(lines) - 1, 2):
-            chunk_lines = lines[i:i + 2]
+            chunk_lines = lines[i : i + 2]
             if len(chunk_lines) == 2:
-                chunks.append({
-                    "id": f"{poem_id}_couplet_{i}",
-                    **base_meta,
-                    "text": "\n".join(chunk_lines),
-                    "chunk_type": "couplet",
-                })
+                chunks.append(
+                    {
+                        "id": f"{poem_id}_couplet_{i}",
+                        **base_meta,
+                        "text": "\n".join(chunk_lines),
+                        "chunk_type": "couplet",
+                    }
+                )
 
         # Quatrains (4-line chunks) for 8-line lüshi
         if len(lines) >= 8:
             for start in (0, 4):
-                chunk_lines = lines[start:start + 4]
+                chunk_lines = lines[start : start + 4]
                 if len(chunk_lines) == 4:
-                    chunks.append({
-                        "id": f"{poem_id}_quatrain_{start}",
-                        **base_meta,
-                        "text": "\n".join(chunk_lines),
-                        "chunk_type": "quatrain",
-                    })
+                    chunks.append(
+                        {
+                            "id": f"{poem_id}_quatrain_{start}",
+                            **base_meta,
+                            "text": "\n".join(chunk_lines),
+                            "chunk_type": "quatrain",
+                        }
+                    )
 
         return chunks
 
@@ -119,7 +125,7 @@ class PoetryIndexer:
 
         total = 0
         for i in range(0, len(all_chunks), BATCH_SIZE):
-            batch = all_chunks[i:i + BATCH_SIZE]
+            batch = all_chunks[i : i + BATCH_SIZE]
             total += self.store.add_poems(batch)
             logger.info(f"Indexed batch {i // BATCH_SIZE + 1}: {len(batch)} chunks")
 

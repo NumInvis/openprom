@@ -16,7 +16,13 @@ CHECK_METER_SCHEMA: Dict[str, Any] = {
     "properties": {
         "action": {
             "type": "string",
-            "enum": ["check", "rhyme_candidates", "char_phonetics", "meter_template", "explain_rule"],
+            "enum": [
+                "check",
+                "rhyme_candidates",
+                "char_phonetics",
+                "meter_template",
+                "explain_rule",
+            ],
             "description": (
                 "执行的操作：\n"
                 "  check — 格律检测（默认）\n"
@@ -68,13 +74,13 @@ CHECK_METER_SCHEMA: Dict[str, Any] = {
         # action=char_phonetics
         "book": {
             "type": "string",
-            "description": "韵书名（action=char_phonetics 时可选，默认\"平水韵\"）。",
+            "description": '韵书名（action=char_phonetics 时可选，默认"平水韵"）。',
             "default": "平水韵",
         },
         # action=meter_template
         "form": {
             "type": "string",
-            "description": "诗体名（action=meter_template 时必填），如\"五绝\"\"七律\"。",
+            "description": '诗体名（action=meter_template 时必填），如"五绝""七律"。',
         },
         "tone_pattern": {
             "type": "string",
@@ -112,15 +118,15 @@ RETRIEVE_POETRY_SCHEMA: Dict[str, Any] = {
         },
         "theme": {
             "type": "string",
-            "description": "创作主题或关键词，如\"春山\"\"边塞\"\"离别\"。",
+            "description": '创作主题或关键词，如"春山""边塞""离别"。',
         },
         "form": {
             "type": "string",
-            "description": "可选：体裁过滤，如\"五绝\"\"七律\"或\"couplet\"。",
+            "description": '可选：体裁过滤，如"五绝""七律"或"couplet"。',
         },
         "dynasty": {
             "type": "string",
-            "description": "可选：朝代过滤，如\"唐\"\"宋\"。",
+            "description": '可选：朝代过滤，如"唐""宋"。',
         },
         "top_k": {
             "type": "integer",
@@ -144,8 +150,7 @@ WEB_SEARCH_SCHEMA: Dict[str, Any] = {
         "query": {
             "type": "string",
             "description": (
-                "搜索查询。可用于查证典故出处、历史背景、植物百科、"
-                "地理考据、字词源流等任意知识。"
+                "搜索查询。可用于查证典故出处、历史背景、植物百科、地理考据、字词源流等任意知识。"
             ),
         },
         "num_results": {

@@ -108,7 +108,9 @@ class FeedbackIngestor:
             documents=[content],
         )
 
-        logger.info("Feedback ingested: id=%s score=%.1f content=%s", result_id, score, content[:40])
+        logger.info(
+            "Feedback ingested: id=%s score=%.1f content=%s", result_id, score, content[:40]
+        )
         return retrieval_result
 
 

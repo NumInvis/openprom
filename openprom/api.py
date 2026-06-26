@@ -12,10 +12,11 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 
 from openprom import __version__
 from openprom.routers import (
@@ -26,15 +27,21 @@ from openprom.routers import (
     knowledge_router,
     tasks_router,
 )
+from openprom.routers.common import PormHTTPException, PormErrorCode
 from openprom.infrastructure.database import get_db_manager
 from openprom.infrastructure.logging import get_logger
 from openprom.utils.env_config import (
-    get_api_key, get_base_url, get_model,
-    get_host, get_port, is_debug
+    get_api_key,
+    get_base_url,
+    get_model,
+    get_host,
+    get_port,
+    is_debug,
 )
 
 try:
     from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -43,15 +50,9 @@ logger = get_logger(__name__)
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter(
-        'porm_requests_total',
-        'Total API requests',
-        ['endpoint', 'method', 'status']
+        "porm_requests_total", "Total API requests", ["endpoint", "method", "status"]
     )
-    REQUEST_LATENCY = Histogram(
-        'porm_request_latency_seconds',
-        'API request latency',
-        ['endpoint']
-    )
+    REQUEST_LATENCY = Histogram("porm_request_latency_seconds", "API request latency", ["endpoint"])
 
 
 @asynccontextmanager
@@ -94,6 +95,30 @@ def create_app() -> FastAPI:
 
     app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
+    # ---- 全局异常处理器：统一错误响应格式，暴露 error_code ----
+    @app.exception_handler(PormHTTPException)
+    async def _handle_porm_exception(_: Request, exc: PormHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "error_code": exc.error_code.value
+                if isinstance(exc.error_code, PormErrorCode)
+                else str(exc.error_code),
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _handle_validation_exception(_: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "请求参数校验失败",
+                "error_code": PormErrorCode.INTERNAL_ERROR.value,
+                "errors": exc.errors(),
+            },
+        )
+
     app.include_router(health_router)
     app.include_router(meter_router)
     app.include_router(couplet_router)
@@ -102,9 +127,11 @@ def create_app() -> FastAPI:
     app.include_router(tasks_router)
 
     if PROMETHEUS_AVAILABLE:
+
         @app.get("/metrics")
         async def metrics():
             from fastapi import Response
+
             return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/")
@@ -120,6 +147,7 @@ app = create_app()
 def main():
     """CLI entrypoint."""
     import uvicorn
+
     uvicorn.run(
         "openprom.api:app",
         host=get_host(),

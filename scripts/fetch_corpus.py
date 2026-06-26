@@ -63,13 +63,13 @@ def main():
     commit = run_git(["rev-parse", "--short", "HEAD"], cwd=str(target))
     file_count = run_git(["ls-files"], cwd=str(target)).count("\n") + 1
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Status  : {action}")
     print(f"Path    : {target}")
     print(f"Commit  : {commit}")
     print(f"Files   : {file_count}")
     print(f"Shallow : {'yes' if shallow else 'no'}")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
 
 
 if __name__ == "__main__":

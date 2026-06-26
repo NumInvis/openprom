@@ -10,6 +10,7 @@ from dataclasses import dataclass
 @dataclass
 class Tool:
     """A callable tool exposed to the LLM."""
+
     name: str
     description: str
     parameters: Dict[str, Any]

@@ -93,7 +93,7 @@ def _normalize_result(content: str) -> str:
                 best_start = i
             i = j
         if best_len >= 4:
-            poem = candidates[best_start:best_start + best_len]
+            poem = candidates[best_start : best_start + best_len]
             if best_len in (4, 8):
                 return "\n".join(poem)
             return "\n".join(poem[:8])
@@ -105,6 +105,7 @@ def _normalize_result(content: str) -> str:
 def _persist_trace(trace) -> None:
     try:
         from openprom.infrastructure.task_trace import get_task_trace_store
+
         get_task_trace_store().save(trace)
     except Exception as e:
         logger.debug("Trace persistence skipped: %s", e)
@@ -113,6 +114,7 @@ def _persist_trace(trace) -> None:
 def _get_meter_context(form: str) -> str:
     try:
         from openprom.tools.poetry_tools import check_meter_unified
+
         result = check_meter_unified(action="meter_template", form=form)
         if result.get("found"):
             return "\n".join(f"{p['name']}：{p['pattern']}" for p in result["patterns"][:4])
@@ -134,11 +136,15 @@ class ShiGenerator:
         self._tools = list(get_tool_registry().values())
         self._settings = get_settings()
 
-    def _phase_inspire(self, theme: str, mode: str, form: str, lines: int, chars: int, trace) -> str:
+    def _phase_inspire(
+        self, theme: str, mode: str, form: str, lines: int, chars: int, trace
+    ) -> str:
         if mode == "generate":
             user_prompt = f"主题：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集灵感。"
         else:
-            user_prompt = f"已给出内容：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集补全灵感。"
+            user_prompt = (
+                f"已给出内容：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集补全灵感。"
+            )
 
         result = self._client.chat_with_tools(
             prompt=user_prompt,
@@ -153,8 +159,15 @@ class ShiGenerator:
         return content
 
     def _phase_create(
-        self, theme: str, mode: str, form: str, lines: int, chars: int,
-        tone_preference: Optional[str], inspiration: str, trace,
+        self,
+        theme: str,
+        mode: str,
+        form: str,
+        lines: int,
+        chars: int,
+        tone_preference: Optional[str],
+        inspiration: str,
+        trace,
     ) -> str:
         meter_ctx = _get_meter_context(form)
         tone_part = f"，采用{tone_preference}格式" if tone_preference else ""
@@ -176,7 +189,9 @@ class ShiGenerator:
 
         result = self._client.chat(prompt=prompt, system_prompt=_CREATE_PROMPT, temperature=0.9)
         content = result.get("content", "")
-        trace.add_step("llm_call", {"phase": "create", "temperature": 0.9, "content_preview": content[:200]})
+        trace.add_step(
+            "llm_call", {"phase": "create", "temperature": 0.9, "content_preview": content[:200]}
+        )
         return content
 
     def _phase_refine(self, draft: str, trace) -> str:
@@ -209,9 +224,13 @@ class ShiGenerator:
                 f"请直接输出修改后的诗句，每句一行，不要解释。"
             )
 
-            result = self._client.chat(prompt=refine_prompt, system_prompt=_REFINE_PROMPT, temperature=0.3)
+            result = self._client.chat(
+                prompt=refine_prompt, system_prompt=_REFINE_PROMPT, temperature=0.3
+            )
             draft = result.get("content", draft)
-            trace.add_step("llm_call", {"phase": "refine", "round": round_idx + 1, "fixes_applied": len(fixes)})
+            trace.add_step(
+                "llm_call", {"phase": "refine", "round": round_idx + 1, "fixes_applied": len(fixes)}
+            )
 
         return draft
 
@@ -236,7 +255,9 @@ class ShiGenerator:
 
         try:
             inspiration = self._phase_inspire(prompt, "generate", form, lines, chars, trace)
-            draft = self._phase_create(prompt, "generate", form, lines, chars, tone_preference, inspiration, trace)
+            draft = self._phase_create(
+                prompt, "generate", form, lines, chars, tone_preference, inspiration, trace
+            )
             final = self._phase_refine(draft, trace)
 
             normalized = _normalize_result(final)
@@ -273,7 +294,9 @@ class ShiGenerator:
 
         try:
             inspiration = self._phase_inspire(prompt, "complete", form, lines, chars, trace)
-            draft = self._phase_create(prompt, "complete", form, lines, chars, tone_preference, inspiration, trace)
+            draft = self._phase_create(
+                prompt, "complete", form, lines, chars, tone_preference, inspiration, trace
+            )
             final = self._phase_refine(draft, trace)
 
             normalized = _normalize_result(final)
@@ -302,7 +325,10 @@ class ShiGenerator:
         prompt_text = f"主题：{prompt}\n体裁：{form}（{lines}句，每句{chars}字）。请创作。"
         max_rounds = max_rounds or self._settings.generation.shi_max_revision_rounds
         yield from self._client.stream_progress(
-            prompt=prompt_text, tools=self._tools, system_prompt=_CREATE_PROMPT, max_rounds=max_rounds,
+            prompt=prompt_text,
+            tools=self._tools,
+            system_prompt=_CREATE_PROMPT,
+            max_rounds=max_rounds,
         )
 
     def complete_stream(
@@ -318,13 +344,20 @@ class ShiGenerator:
         prompt_text = f"已给出内容：{prompt}\n体裁：{form}（{lines}句，每句{chars}字）。请补全。"
         max_rounds = max_rounds or self._settings.generation.shi_max_revision_rounds
         yield from self._client.stream_progress(
-            prompt=prompt_text, tools=self._tools, system_prompt=_CREATE_PROMPT, max_rounds=max_rounds,
+            prompt=prompt_text,
+            tools=self._tools,
+            system_prompt=_CREATE_PROMPT,
+            max_rounds=max_rounds,
         )
 
 
-def generate_shi(prompt: str, form: Optional[str] = None, tone_preference: Optional[str] = None) -> Dict[str, Any]:
+def generate_shi(
+    prompt: str, form: Optional[str] = None, tone_preference: Optional[str] = None
+) -> Dict[str, Any]:
     return ShiGenerator().generate(prompt, form, tone_preference)
 
 
-def complete_shi(prompt: str, form: Optional[str] = None, tone_preference: Optional[str] = None) -> Dict[str, Any]:
+def complete_shi(
+    prompt: str, form: Optional[str] = None, tone_preference: Optional[str] = None
+) -> Dict[str, Any]:
     return ShiGenerator().complete(prompt, form, tone_preference)

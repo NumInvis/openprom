@@ -35,6 +35,7 @@ class PoetryVectorStore:
     @staticmethod
     def _default_persist_dir() -> str:
         from pathlib import Path
+
         return str(Path(__file__).parent.parent.parent / "data" / "vector_store")
 
     def _ensure_client(self):
@@ -109,12 +110,14 @@ class PoetryVectorStore:
         results = self._collection.query(**kwargs)
         poems = []
         for i, doc_id in enumerate(results["ids"][0]):
-            poems.append({
-                "id": doc_id,
-                "text": results["documents"][0][i],
-                "metadata": results["metadatas"][0][i],
-                "distance": results["distances"][0][i],
-            })
+            poems.append(
+                {
+                    "id": doc_id,
+                    "text": results["documents"][0][i],
+                    "metadata": results["metadatas"][0][i],
+                    "distance": results["distances"][0][i],
+                }
+            )
         return poems
 
     def count(self) -> int:

@@ -71,8 +71,7 @@ class ImagerySkill(KnowledgeSkill):
 
     name = "retrieve_imagery"
     description = (
-        "检索与主题相关的古人诗作，提取其中的意象、用词与炼字技巧，"
-        "供创作时借鉴，避免现代白话化。"
+        "检索与主题相关的古人诗作，提取其中的意象、用词与炼字技巧，供创作时借鉴，避免现代白话化。"
     )
 
     def __init__(self, pipeline: Optional[RetrievalPipeline] = None):
@@ -98,9 +97,7 @@ class LineInspirationSkill(KnowledgeSkill):
     """Retrieve individual lines or couplets for inspiration."""
 
     name = "retrieve_lines"
-    description = (
-        "检索与主题相关的古人诗句或对联，用于获取韵脚、对仗或意象灵感。"
-    )
+    description = "检索与主题相关的古人诗句或对联，用于获取韵脚、对仗或意象灵感。"
 
     def __init__(self, pipeline: Optional[RetrievalPipeline] = None):
         self.pipeline = pipeline or get_retrieval_pipeline()
@@ -117,9 +114,7 @@ class RhymeContextSkill(KnowledgeSkill):
     """Retrieve classic ending lines in the same rhyme category."""
 
     name = "retrieve_rhyme_context"
-    description = (
-        "检索同韵部的经典收尾句与韵律分析，帮助选择合适的韵脚。"
-    )
+    description = "检索同韵部的经典收尾句与韵律分析，帮助选择合适的韵脚。"
 
     def __init__(self, pipeline: Optional[RetrievalPipeline] = None):
         self.pipeline = pipeline or get_retrieval_pipeline()
@@ -145,9 +140,7 @@ class FormExampleSkill(KnowledgeSkill):
     """Retrieve compliant poems of a specific form with meter annotations."""
 
     name = "retrieve_form_examples"
-    description = (
-        "检索指定格律体裁的合规范诗，并附格律标注，帮助理解该体裁的规则。"
-    )
+    description = "检索指定格律体裁的合规范诗，并附格律标注，帮助理解该体裁的规则。"
 
     def __init__(self, pipeline: Optional[RetrievalPipeline] = None):
         self.pipeline = pipeline or get_retrieval_pipeline()

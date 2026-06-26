@@ -34,6 +34,7 @@ async def knowledge_search(request: KnowledgeSearchRequest) -> KnowledgeSearchRe
     """
     try:
         from openprom.knowledge.retrieval.pipeline import get_retrieval_pipeline
+
         pipeline = get_retrieval_pipeline()
     except Exception as e:
         raise PormHTTPException(
@@ -89,6 +90,7 @@ async def knowledge_search(request: KnowledgeSearchRequest) -> KnowledgeSearchRe
 async def knowledge_stats() -> KnowledgeStatsResponse:
     """Inspect knowledge layer state: vector store size, cache stats, providers, skills."""
     from openprom.infrastructure.config.settings import get_settings
+
     settings = get_settings()
     features = getattr(settings, "features", None)
     knowledge_cfg = getattr(settings, "knowledge", None)
@@ -105,6 +107,7 @@ async def knowledge_stats() -> KnowledgeStatsResponse:
 
     try:
         from openprom.knowledge.providers.vector_store import get_vector_store
+
         store = get_vector_store()
         vector_size = store.count()
     except Exception as e:
@@ -112,6 +115,7 @@ async def knowledge_stats() -> KnowledgeStatsResponse:
 
     try:
         from openprom.knowledge.providers import get_embedding_provider, get_rerank_provider
+
         embedding_provider = getattr(get_embedding_provider(), "name", "unknown")
         rerank_provider = getattr(get_rerank_provider(), "name", "unknown")
     except Exception as e:
@@ -119,6 +123,7 @@ async def knowledge_stats() -> KnowledgeStatsResponse:
 
     try:
         from openprom.knowledge.memory.cache import get_retrieval_cache, get_rerank_cache
+
         retrieval_stats = get_retrieval_cache().stats()
         rerank_stats = get_rerank_cache().stats()
     except Exception as e:
@@ -126,6 +131,7 @@ async def knowledge_stats() -> KnowledgeStatsResponse:
 
     try:
         from openprom.knowledge.skills.classic import get_knowledge_skills
+
         skills = list(get_knowledge_skills().keys())
     except Exception as e:
         logger.debug("Skills list unavailable: %s", e)

@@ -18,15 +18,47 @@ class TestRushengDetection:
     def test_rusheng_chars_are_ze(self, engine):
         """常见入声字在今音中分散为平/上/去，但律诗中一律算仄声"""
         # 这些字今音为阳平(2声)，但中古是入声→应判为仄
-        modern_ping_but_rusheng = ["白", "石", "国", "独", "读", "竹", "福", "服", "伏",
-                                    "俗", "族", "足", "局", "席", "籍", "敌", "笛", "迪",
-                                    "辑", "集", "及", "极", "急", "疾", "吉", "即", "节",
-                                    "杰", "洁", "结", "劫", "竭", "截", "捷", "睫"]
+        modern_ping_but_rusheng = [
+            "白",
+            "石",
+            "国",
+            "独",
+            "读",
+            "竹",
+            "福",
+            "服",
+            "伏",
+            "俗",
+            "族",
+            "足",
+            "局",
+            "席",
+            "籍",
+            "敌",
+            "笛",
+            "迪",
+            "辑",
+            "集",
+            "及",
+            "极",
+            "急",
+            "疾",
+            "吉",
+            "即",
+            "节",
+            "杰",
+            "洁",
+            "结",
+            "劫",
+            "竭",
+            "截",
+            "捷",
+            "睫",
+        ]
         for char in modern_ping_but_rusheng:
             result = engine.analyze(char)
             assert result.pingze == PingZeValue.ZE, (
-                f"「{char}」中古入声字，应判为仄声，"
-                f"实际={result.pingze}，method={result.method}"
+                f"「{char}」中古入声字，应判为仄声，实际={result.pingze}，method={result.method}"
             )
 
     def test_rusheng_method_is_rusheng(self, engine):
@@ -43,9 +75,32 @@ class TestRushengDetection:
 
     def test_rusheng_chars_modern_ze_still_ze(self, engine):
         """今音为仄的入声字仍应判为仄"""
-        modern_ze_rusheng = ["月", "雪", "色", "业", "叶", "绝", "铁", "帖",
-                              "塔", "踏", "纳", "杂", "合", "答", "搭", "鸽",
-                              "割", "葛", "渴", "喝", "脱", "夺", "括", "阔"]
+        modern_ze_rusheng = [
+            "月",
+            "雪",
+            "色",
+            "业",
+            "叶",
+            "绝",
+            "铁",
+            "帖",
+            "塔",
+            "踏",
+            "纳",
+            "杂",
+            "合",
+            "答",
+            "搭",
+            "鸽",
+            "割",
+            "葛",
+            "渴",
+            "喝",
+            "脱",
+            "夺",
+            "括",
+            "阔",
+        ]
         for char in modern_ze_rusheng:
             result = engine.analyze(char)
             assert result.pingze == PingZeValue.ZE, f"「{char}」应为仄声"
@@ -109,7 +164,25 @@ class TestRushengTableIntegrity:
     def test_rusheng_table_has_common_chars(self):
         """入声字表应包含常用入声字"""
         engine = get_engine()
-        must_have = {"白", "石", "月", "雪", "国", "色", "竹", "独", "读",
-                     "福", "服", "局", "足", "族", "急", "及", "节", "绝"}
+        must_have = {
+            "白",
+            "石",
+            "月",
+            "雪",
+            "国",
+            "色",
+            "竹",
+            "独",
+            "读",
+            "福",
+            "服",
+            "局",
+            "足",
+            "族",
+            "急",
+            "及",
+            "节",
+            "绝",
+        }
         missing = must_have - engine._rusheng_chars
         assert not missing, f"入声字表缺少: {missing}"

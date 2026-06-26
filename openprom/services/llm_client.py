@@ -9,7 +9,6 @@ import logging
 import time
 import threading
 from typing import Any, Dict, Iterable, List, Optional, Callable
-from dataclasses import dataclass
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
@@ -19,15 +18,6 @@ from openprom.tools.schemas import Tool
 from openprom.utils.json_parser import parse_llm_json_response
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class LLMResponse:
-    """Normalized LLM response."""
-    content: str
-    tool_calls: List[Dict[str, Any]]
-    model: str
-    usage: Optional[Dict[str, int]] = None
 
 
 class LLMClient:
@@ -93,7 +83,7 @@ class LLMClient:
                 return client.chat.completions.create(**kwargs)
             except Exception as e:
                 last_error = e
-                logger.warning(f"LLM call failed (attempt {attempt+1}/{max_retries}): {e}")
+                logger.warning(f"LLM call failed (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
         raise RuntimeError(f"LLM call failed after {max_retries} attempts: {last_error}")
@@ -201,12 +191,14 @@ class LLMClient:
                         result = {"error": str(e)}
                 if progress_callback:
                     progress_callback("tool_result", {"tool": name, "result": result})
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": name,
-                    "content": json.dumps(result, ensure_ascii=False),
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "name": name,
+                        "content": json.dumps(result, ensure_ascii=False),
+                    }
+                )
 
         # If we exhaust rounds without a final answer, return the last assistant message.
         last = messages[-1]

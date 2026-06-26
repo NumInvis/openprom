@@ -80,9 +80,11 @@ def _make_client_with_mock_openai(responses):
 class TestChatWithTools:
     def test_no_tools_returns_content_immediately(self):
         """When the LLM returns no tool calls, the loop ends after round 1."""
-        client = _make_client_with_mock_openai([
-            _mock_response(content="Hello world"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content="Hello world"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="hi",
             tools=[],
@@ -95,10 +97,12 @@ class TestChatWithTools:
         """LLM calls a tool in round 1, then returns content in round 2."""
         tool = _make_tool(ret={"is_compliant": True})
         tc = _mock_tool_call("check_meter", {"text": "test"})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content="Done"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content="Done"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="check this",
             tools=[tool],
@@ -114,10 +118,12 @@ class TestChatWithTools:
         tool2 = _make_tool("tool_b", ret={"ok": 2})
         tc1 = _mock_tool_call("tool_a", {"x": 1})
         tc2 = _mock_tool_call("tool_b", {"y": 2})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc1, tc2]),
-            _mock_response(content="Both done"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc1, tc2]),
+                _mock_response(content="Both done"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="run both",
             tools=[tool1, tool2],
@@ -131,11 +137,13 @@ class TestChatWithTools:
         """When max_rounds is reached without a final answer, return last message."""
         tc = _mock_tool_call("check_meter", {"text": "x"})
         # Always return a tool call, never a final answer
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content=None, tool_calls=[tc]),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content=None, tool_calls=[tc]),
+            ]
+        )
         tool = _make_tool()
         result = client.chat_with_tools(
             prompt="loop",
@@ -150,10 +158,12 @@ class TestChatWithTools:
     def test_unknown_tool_returns_error(self):
         """Calling an unregistered tool produces an error result in messages."""
         tc = _mock_tool_call("nonexistent", {})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content="ok"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content="ok"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="x",
             tools=[],
@@ -169,10 +179,12 @@ class TestChatWithTools:
         tool = _make_tool()
         tool.func = MagicMock(side_effect=RuntimeError("boom"))
         tc = _mock_tool_call("check_meter", {"text": "x"})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content="recovered"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content="recovered"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="x",
             tools=[tool],
@@ -186,10 +198,12 @@ class TestChatWithTools:
         """progress_callback receives thinking, tool_call, tool_result, done."""
         tool = _make_tool(ret={"ok": True})
         tc = _mock_tool_call("check_meter", {"text": "x"})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content="final"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content="final"),
+            ]
+        )
         events = []
 
         def cb(event, payload):
@@ -209,9 +223,11 @@ class TestChatWithTools:
 
     def test_system_prompt_included_in_messages(self):
         """When system_prompt is provided, it's the first message."""
-        client = _make_client_with_mock_openai([
-            _mock_response(content="ok"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content="ok"),
+            ]
+        )
         result = client.chat_with_tools(
             prompt="hi",
             tools=[],
@@ -222,9 +238,11 @@ class TestChatWithTools:
 
     def test_temperature_override(self):
         """Custom temperature is passed to the API."""
-        client = _make_client_with_mock_openai([
-            _mock_response(content="ok"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content="ok"),
+            ]
+        )
         client.chat_with_tools(
             prompt="hi",
             tools=[],
@@ -239,15 +257,19 @@ class TestStreamProgress:
         """stream_progress should yield thinking, tool_call, tool_result, final."""
         tool = _make_tool(ret={"is_compliant": True})
         tc = _mock_tool_call("check_meter", {"text": "x"})
-        client = _make_client_with_mock_openai([
-            _mock_response(content=None, tool_calls=[tc]),
-            _mock_response(content="final answer"),
-        ])
-        lines = list(client.stream_progress(
-            prompt="x",
-            tools=[tool],
-            max_rounds=3,
-        ))
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content=None, tool_calls=[tc]),
+                _mock_response(content="final answer"),
+            ]
+        )
+        lines = list(
+            client.stream_progress(
+                prompt="x",
+                tools=[tool],
+                max_rounds=3,
+            )
+        )
         # Parse data lines, ignoring keep-alive comments
         events = []
         for line in lines:
@@ -272,38 +294,48 @@ class TestStreamProgress:
         tool = _make_tool()
         tool.func = MagicMock(side_effect=RuntimeError("boom"))
         tc = _mock_tool_call("check_meter", {"text": "x"})
-        client._client.chat.completions.create = MagicMock(side_effect=[
-            _mock_response(content=None, tool_calls=[tc]),
-        ])
-        lines = list(client.stream_progress(
-            prompt="x",
-            tools=[tool],
-            max_rounds=3,
-        ))
+        client._client.chat.completions.create = MagicMock(
+            side_effect=[
+                _mock_response(content=None, tool_calls=[tc]),
+            ]
+        )
+        lines = list(
+            client.stream_progress(
+                prompt="x",
+                tools=[tool],
+                max_rounds=3,
+            )
+        )
         events = [json.loads(line[6:]) for line in lines if line.startswith("data: ")]
         assert events[-1]["event"] == "error"
 
 
 class TestChat:
     def test_simple_chat(self):
-        client = _make_client_with_mock_openai([
-            _mock_response(content="Hello"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content="Hello"),
+            ]
+        )
         result = client.chat(prompt="hi")
         assert result["content"] == "Hello"
 
     def test_json_mode_parses(self):
-        client = _make_client_with_mock_openai([
-            _mock_response(content='{"score": 85, "grade": "good"}'),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content='{"score": 85, "grade": "good"}'),
+            ]
+        )
         result = client.chat(prompt="rate this", json_mode=True)
         assert result["score"] == 85
         assert result["grade"] == "good"
 
     def test_system_prompt_prepended(self):
-        client = _make_client_with_mock_openai([
-            _mock_response(content="ok"),
-        ])
+        client = _make_client_with_mock_openai(
+            [
+                _mock_response(content="ok"),
+            ]
+        )
         client.chat(prompt="hi", system_prompt="Be brief.")
         msgs = client._client.chat.completions.create.call_args.kwargs["messages"]
         assert msgs[0]["role"] == "system"

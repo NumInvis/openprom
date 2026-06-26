@@ -16,6 +16,7 @@ from openprom.knowledge.indexing.corpus_builder import chunk_record, load_source
 
 # ---- normalizer tests ----
 
+
 class TestNormalizeText:
     def test_strips_whitespace(self):
         assert normalize_text("  hello  ") == "hello"
@@ -89,6 +90,7 @@ class TestNormalizeBatch:
 
 
 # ---- enricher tests ----
+
 
 class TestDetectForm:
     def test_wu_jue(self):
@@ -187,6 +189,7 @@ class TestEnrichRecord:
 
 # ---- validator tests ----
 
+
 class TestValidateRecord:
     def test_valid_record(self):
         rec = {
@@ -249,6 +252,7 @@ class TestValidateBatch:
 
 
 # ---- corpus_builder chunk_record tests ----
+
 
 class TestChunkRecord:
     def test_four_line_poem(self):
@@ -314,6 +318,7 @@ class TestChunkRecord:
 
 
 # ---- load_source tests ----
+
 
 class TestLoadSource:
     def test_nonexistent_path(self):

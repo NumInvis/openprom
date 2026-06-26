@@ -7,10 +7,7 @@ from openprom.services.couplet_scorer import CoupletScorer
 from openprom.utils.env_config import get_api_key
 
 
-@pytest.mark.skipif(
-    not os.getenv("OPENPROM_API_KEY"),
-    reason="需要 OPENPROM_API_KEY 环境变量"
-)
+@pytest.mark.skipif(not os.getenv("OPENPROM_API_KEY"), reason="需要 OPENPROM_API_KEY 环境变量")
 def test_couplet_scoring():
     """测试对联评分（需要真实 API Key）"""
     api_key = get_api_key()

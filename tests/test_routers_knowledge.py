@@ -12,9 +12,14 @@ def test_knowledge_stats_returns_shape():
     assert resp.status_code == 200
     data = resp.json()
     for key in [
-        "enabled", "knowledge_layer_v2", "vector_store_size",
-        "retrieval_cache", "rerank_cache",
-        "embedding_provider", "rerank_provider", "skills",
+        "enabled",
+        "knowledge_layer_v2",
+        "vector_store_size",
+        "retrieval_cache",
+        "rerank_cache",
+        "embedding_provider",
+        "rerank_provider",
+        "skills",
     ]:
         assert key in data
 
@@ -51,10 +56,13 @@ def test_knowledge_search_with_stub_pipeline(monkeypatch):
         lambda: _Pipeline(),
     )
     # Re-import in router (uses lazy import inside endpoint), so that path is enough.
-    resp = client.post("/api/v1/knowledge/search", json={
-        "query": "春风",
-        "top_k": 3,
-    })
+    resp = client.post(
+        "/api/v1/knowledge/search",
+        json={
+            "query": "春风",
+            "top_k": 3,
+        },
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["query"] == "春风"

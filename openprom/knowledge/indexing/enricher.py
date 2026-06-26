@@ -56,11 +56,13 @@ def split_couplet(content: str) -> List[Dict[str, str]]:
     for i in range(0, len(lines) - 1, 2):
         pos_idx = i // 2
         position = positions[pos_idx] if pos_idx < len(positions) else f"couplet_{pos_idx + 1}"
-        couplets.append({
-            "upper": lines[i],
-            "lower": lines[i + 1] if i + 1 < len(lines) else "",
-            "position": position,
-        })
+        couplets.append(
+            {
+                "upper": lines[i],
+                "lower": lines[i + 1] if i + 1 < len(lines) else "",
+                "position": position,
+            }
+        )
     return couplets
 
 
@@ -74,6 +76,7 @@ def detect_rhyme_category(content: str) -> Optional[str]:
         return None
     try:
         from openprom.data.loader import RhymeBook
+
         rhymebook = RhymeBook.get()
         return rhymebook.get_rhyme_category(last_char)
     except Exception as e:

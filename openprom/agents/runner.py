@@ -51,12 +51,14 @@ class AgentRunner:
     def _ensure_llm(self):
         if self._llm is None:
             from openprom.services.llm_client import get_llm_client
+
             self._llm = get_llm_client()
         return self._llm
 
     def _ensure_tools(self) -> Dict[str, Any]:
         if self._tool_registry is None:
             from openprom.tools.registry import get_tool_registry
+
             self._tool_registry = get_tool_registry()
         return self._tool_registry
 
@@ -140,9 +142,7 @@ class AgentRunner:
                 elif event == "tool_result":
                     last = trace.steps[-1] if trace.steps else None
                     if last and last.step_type == "tool_call":
-                        last.data["result"] = self._summarize_tool_result(
-                            payload.get("result")
-                        )
+                        last.data["result"] = self._summarize_tool_result(payload.get("result"))
 
             llm_t0 = time.time()
             llm = self._ensure_llm()
@@ -159,7 +159,10 @@ class AgentRunner:
             content = result.get("content", "")
             trace.add_step(
                 "result",
-                {"content_preview": content[:120], "messages_count": len(result.get("messages", []))},
+                {
+                    "content_preview": content[:120],
+                    "messages_count": len(result.get("messages", [])),
+                },
                 duration_ms=llm_dur,
             )
             trace.success = True
@@ -188,6 +191,7 @@ class AgentRunner:
         """
         try:
             from openprom.infrastructure.config.settings import get_settings
+
             settings = get_settings()
 
             features = getattr(settings, "features", None)
@@ -253,6 +257,7 @@ class AgentRunner:
             store = self._trace_store
             if store is None:
                 from openprom.infrastructure.task_trace import get_task_trace_store
+
                 store = get_task_trace_store()
             store.save(trace)
         except Exception as e:

@@ -61,6 +61,7 @@ if PROMETHEUS_AVAILABLE:
 # Helper functions
 # ---------------------------------------------------------------------------
 
+
 def record_retrieval(
     query_type: str,
     latency: float,

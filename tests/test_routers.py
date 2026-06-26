@@ -17,10 +17,9 @@ def test_health():
 
 
 def test_meter_check_couplet():
-    resp = client.post("/api/v1/meter/check", json={
-        "text": "春风化雨\n秋月凝霜",
-        "meter_type": "couplet"
-    })
+    resp = client.post(
+        "/api/v1/meter/check", json={"text": "春风化雨\n秋月凝霜", "meter_type": "couplet"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["meter_type"] == "couplet"
@@ -28,10 +27,9 @@ def test_meter_check_couplet():
 
 
 def test_meter_check_shi():
-    resp = client.post("/api/v1/meter/check", json={
-        "text": "春眠不觉晓\n处处闻啼鸟",
-        "meter_type": "shi"
-    })
+    resp = client.post(
+        "/api/v1/meter/check", json={"text": "春眠不觉晓\n处处闻啼鸟", "meter_type": "shi"}
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["meter_type"] == "shi"
@@ -47,11 +45,10 @@ def test_meter_list():
 
 
 def test_couplet_analyze_length_mismatch():
-    resp = client.post("/api/v1/couplet/analyze", json={
-        "upper": "春风化雨润",
-        "lower": "秋月凝霜",
-        "stream": False
-    })
+    resp = client.post(
+        "/api/v1/couplet/analyze",
+        json={"upper": "春风化雨润", "lower": "秋月凝霜", "stream": False},
+    )
     assert resp.status_code == 400
 
 
@@ -81,6 +78,8 @@ def test_couplet_history_with_session_id():
     score.warnings = []
     score.comments = {}
     score.word_analysis = []
+    score.llm_technique_evaluation = {}
+    score.llm_rhetoric_evaluation = {}
 
     with patch.object(CoupletScorer, "analyze", return_value=score):
         resp = client.post(

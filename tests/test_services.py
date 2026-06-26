@@ -37,15 +37,18 @@ def test_explain_rule():
 def test_generator_meter_context():
     # Validate that meter context can be retrieved without API call
     from openprom.services.couplet_generator import _get_meter_context
+
     ctx = _get_meter_context(7)
     assert len(ctx) > 0  # Should return pattern strings
 
     from openprom.services.shi_generator import _get_meter_context as shi_ctx
+
     ctx2 = shi_ctx("七律")
     assert len(ctx2) > 0
 
 
 def test_shi_generator_resolve_form():
     from openprom.services.shi_generator import _resolve_form
+
     assert _resolve_form("五律") == "五律"
     assert _resolve_form(None) in ("七律", "五律")

@@ -37,9 +37,7 @@ class OnnxRerankProvider:
         model_path: Optional[str] = None,
         max_length: int = _MAX_LENGTH,
     ):
-        self.model_name = model_name or os.getenv(
-            "OPENPROM_RERANK_MODEL", _DEFAULT_MODEL
-        )
+        self.model_name = model_name or os.getenv("OPENPROM_RERANK_MODEL", _DEFAULT_MODEL)
         self.model_path = model_path
         self.max_length = max_length
         self._session = None
@@ -62,18 +60,14 @@ class OnnxRerankProvider:
         logger.info("Loading ONNX rerank model from %s", model_dir)
 
         onnx_path = os.path.join(model_dir, "model.onnx")
-        self._session = ort.InferenceSession(
-            onnx_path, providers=["CPUExecutionProvider"]
-        )
+        self._session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
         self._tokenizer = AutoTokenizer.from_pretrained(model_dir)
         logger.info("ONNX rerank model loaded: %s", model_dir)
 
     def _sigmoid(self, x: float) -> float:
         return 1.0 / (1.0 + math.exp(-x))
 
-    def rerank(
-        self, query: str, docs: List[str], top_k: int = 10
-    ) -> List[Tuple[int, float]]:
+    def rerank(self, query: str, docs: List[str], top_k: int = 10) -> List[Tuple[int, float]]:
         """Rerank docs against query using cross-encoder scoring.
 
         Returns list of (original_index, score) sorted by score descending,

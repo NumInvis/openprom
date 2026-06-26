@@ -30,10 +30,19 @@ try:
         record_retrieval,
     )
 except Exception:
-    def record_retrieval(*a, **kw): pass
-    def record_rerank(*a, **kw): pass
-    def record_cache_hit(*a, **kw): pass
-    def record_embedding_call(*a, **kw): pass
+
+    def record_retrieval(*a, **kw):
+        pass
+
+    def record_rerank(*a, **kw):
+        pass
+
+    def record_cache_hit(*a, **kw):
+        pass
+
+    def record_embedding_call(*a, **kw):
+        pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +56,7 @@ def _tokenize(text: str) -> List[str]:
         return []
     try:
         import jieba
+
         return [t for t in jieba.lcut(text) if t.strip()]
     except Exception:
         return [c for c in text if "\u4e00" <= c <= "\u9fff"]
@@ -63,6 +73,7 @@ class _KeywordIndex:
         self._bm25 = None
         try:
             from rank_bm25 import BM25Okapi
+
             self._bm25 = BM25Okapi(self.tokenized_docs)
         except Exception as e:
             logger.warning(f"BM25 not available ({e}), falling back to token overlap")
@@ -79,8 +90,7 @@ class _KeywordIndex:
             for doc_tokens in self.tokenized_docs:
                 doc_counter = Counter(doc_tokens)
                 score = sum(
-                    count * doc_counter.get(token, 0)
-                    for token, count in query_counter.items()
+                    count * doc_counter.get(token, 0) for token, count in query_counter.items()
                 )
                 if doc_tokens:
                     score /= len(doc_tokens) ** 0.5
@@ -182,6 +192,7 @@ class RetrievalPipeline:
         self._retrieval_cache = None
         try:
             from openprom.knowledge.memory.cache import get_rerank_cache, get_retrieval_cache
+
             self._rerank_cache = get_rerank_cache()
             self._retrieval_cache = get_retrieval_cache()
         except Exception:
@@ -245,12 +256,14 @@ class RetrievalPipeline:
                         break
                 if skip:
                     continue
-            results.append({
-                "id": doc_id,
-                "text": doc,
-                "metadata": meta,
-                "keyword_score": score,
-            })
+            results.append(
+                {
+                    "id": doc_id,
+                    "text": doc,
+                    "metadata": meta,
+                    "keyword_score": score,
+                }
+            )
         return results[:top_k]
 
     def _rrf_fusion(
@@ -366,9 +379,7 @@ class RetrievalPipeline:
             # Compute rule signals
             rule_signals = {}
             if self.enable_rule_signals:
-                rule_signals = extract_rule_signals(
-                    text, meta, target_form, target_rhyme_category
-                )
+                rule_signals = extract_rule_signals(text, meta, target_form, target_rhyme_category)
 
             # Compute final score
             semantic_score = item.get("hybrid_score", 1.0 - item.get("distance", 0.0))
@@ -408,18 +419,20 @@ class RetrievalPipeline:
                 version=meta.get("version", ""),
             )
 
-            results.append(RetrievalResult(
-                id=item.get("id", ""),
-                content=text,
-                annotated=annotated,
-                semantic_score=semantic_score,
-                rerank_score=rerank_score,
-                rule_signals=rule_signals,
-                final_score=final_score,
-                provenance=provenance,
-                chunk_type=meta.get("chunk_type", "poem"),
-                metadata=meta,
-            ))
+            results.append(
+                RetrievalResult(
+                    id=item.get("id", ""),
+                    content=text,
+                    annotated=annotated,
+                    semantic_score=semantic_score,
+                    rerank_score=rerank_score,
+                    rule_signals=rule_signals,
+                    final_score=final_score,
+                    provenance=provenance,
+                    chunk_type=meta.get("chunk_type", "poem"),
+                    metadata=meta,
+                )
+            )
 
         # Sort by final_score descending
         results.sort(key=lambda r: r.final_score, reverse=True)
@@ -453,6 +466,7 @@ class RetrievalPipeline:
             task_type: Task type for query planner (e.g. 'generate_couplet').
         """
         import time
+
         t0 = time.time()
 
         # Apply query planner if task_type specified
@@ -513,6 +527,7 @@ def get_retrieval_pipeline() -> RetrievalPipeline:
     if _global_pipeline is not None:
         return _global_pipeline
     from openprom.infrastructure.config.settings import get_settings
+
     settings = get_settings()
     hcfg = getattr(settings, "hermes", None)
     _global_pipeline = RetrievalPipeline(

@@ -22,6 +22,7 @@ def _tokenize(text: str) -> List[str]:
         return []
     try:
         import jieba
+
         return [t for t in jieba.lcut(text) if t.strip()]
     except Exception:
         # Fallback: character tokens, drop punctuation/whitespace
@@ -39,6 +40,7 @@ class _KeywordIndex:
         self._bm25: Optional[Any] = None
         try:
             from rank_bm25 import BM25Okapi
+
             self._bm25 = BM25Okapi(self.tokenized_docs)
         except Exception as e:
             logger.warning(f"BM25 not available ({e}), falling back to token overlap")
@@ -55,8 +57,7 @@ class _KeywordIndex:
             for doc_tokens in self.tokenized_docs:
                 doc_counter = Counter(doc_tokens)
                 score = sum(
-                    count * doc_counter.get(token, 0)
-                    for token, count in query_counter.items()
+                    count * doc_counter.get(token, 0) for token, count in query_counter.items()
                 )
                 # tf-idf-ish length normalization
                 if doc_tokens:
@@ -150,12 +151,14 @@ class HermesRetriever:
             doc, meta = id_to_meta_doc.get(doc_id, ("", {}))
             if filters and not self._passes_filters(meta, filters):
                 continue
-            results.append({
-                "id": doc_id,
-                "text": doc,
-                "metadata": meta,
-                "keyword_score": score,
-            })
+            results.append(
+                {
+                    "id": doc_id,
+                    "text": doc,
+                    "metadata": meta,
+                    "keyword_score": score,
+                }
+            )
         return results[:top_k]
 
     def _rank_ids(
@@ -235,6 +238,7 @@ def get_hermes_retriever() -> HermesRetriever:
     global _global_retriever
     if _global_retriever is None:
         from openprom.infrastructure.config.settings import get_settings
+
         settings = get_settings()
         # Check if new knowledge layer is enabled
         features = getattr(settings, "features", None)

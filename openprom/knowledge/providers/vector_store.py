@@ -108,7 +108,9 @@ class ChromaVectorStore:
     ) -> List[Dict[str, Any]]:
         self._ensure_client()
         kwargs: Dict[str, Any] = {
-            "query_embeddings": [embedding.tolist() if isinstance(embedding, np.ndarray) else embedding],
+            "query_embeddings": [
+                embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
+            ],
             "n_results": top_k,
             "include": ["documents", "metadatas", "distances"],
         }
@@ -117,12 +119,14 @@ class ChromaVectorStore:
         results = self._collection.query(**kwargs)
         items = []
         for i, doc_id in enumerate(results["ids"][0]):
-            items.append({
-                "id": doc_id,
-                "text": results["documents"][0][i],
-                "metadata": results["metadatas"][0][i],
-                "distance": results["distances"][0][i],
-            })
+            items.append(
+                {
+                    "id": doc_id,
+                    "text": results["documents"][0][i],
+                    "metadata": results["metadatas"][0][i],
+                    "distance": results["distances"][0][i],
+                }
+            )
         return items
 
     def count(self) -> int:

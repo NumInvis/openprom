@@ -18,6 +18,7 @@ def compute_meter_match(candidate_text: str, target_form: Optional[str] = None) 
         return 0.5
     try:
         from openprom.engines.meter import get_engine
+
         engine = get_engine()
         lines = [ln.strip() for ln in candidate_text.split("\n") if ln.strip()]
         if not lines:
@@ -47,6 +48,7 @@ def compute_rhyme_consistency(
         return 0.5
     try:
         from openprom.data.loader import RhymeBook
+
         rhymebook = RhymeBook.get()
         lines = [ln.strip() for ln in candidate_text.split("\n") if ln.strip()]
         if not lines:
@@ -63,7 +65,9 @@ def compute_rhyme_consistency(
         return 0.5
 
 
-def compute_form_match(candidate_metadata: Dict[str, Any], target_form: Optional[str] = None) -> float:
+def compute_form_match(
+    candidate_metadata: Dict[str, Any], target_form: Optional[str] = None
+) -> float:
     """Check if candidate's form matches target. Returns 0.0 or 1.0."""
     if not target_form:
         return 0.5

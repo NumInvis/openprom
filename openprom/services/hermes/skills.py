@@ -22,8 +22,7 @@ class ClassicPoetrySkill(HermesSkill):
 
     name = "retrieve_poems"
     description = (
-        "根据主题、体裁或朝代检索古人诗作全文，作为创作的参考范例。"
-        "返回诗作标题、作者、朝代与正文。"
+        "根据主题、体裁或朝代检索古人诗作全文，作为创作的参考范例。返回诗作标题、作者、朝代与正文。"
     )
 
     def __init__(self, retriever: Optional[HermesRetriever] = None):
@@ -47,11 +46,16 @@ class ClassicPoetrySkill(HermesSkill):
         parts = ["【古人诗作参考】"]
         for p in poems:
             meta = p.get("metadata", {})
-            header = " ".join(filter(None, [
-                meta.get("dynasty"),
-                meta.get("author"),
-                meta.get("title"),
-            ]))
+            header = " ".join(
+                filter(
+                    None,
+                    [
+                        meta.get("dynasty"),
+                        meta.get("author"),
+                        meta.get("title"),
+                    ],
+                )
+            )
             parts.append(f"《{header}》")
             parts.append(p.get("text", ""))
             parts.append("")
@@ -63,8 +67,7 @@ class ImagerySkill(HermesSkill):
 
     name = "retrieve_imagery"
     description = (
-        "检索与主题相关的古人诗作，提取其中的意象、用词与炼字技巧，"
-        "供创作时借鉴，避免现代白话化。"
+        "检索与主题相关的古人诗作，提取其中的意象、用词与炼字技巧，供创作时借鉴，避免现代白话化。"
     )
 
     def __init__(self, retriever: Optional[HermesRetriever] = None):
@@ -87,11 +90,16 @@ class ImagerySkill(HermesSkill):
         for p in poems:
             text = p.get("text", "")
             meta = p.get("metadata", {})
-            header = " ".join(filter(None, [
-                meta.get("dynasty"),
-                meta.get("author"),
-                meta.get("title"),
-            ]))
+            header = " ".join(
+                filter(
+                    None,
+                    [
+                        meta.get("dynasty"),
+                        meta.get("author"),
+                        meta.get("title"),
+                    ],
+                )
+            )
             if text:
                 notes.append(f"- {header or '古人'}：{text.replace(chr(10), ' / ')}")
         return "\n".join(notes)
@@ -101,9 +109,7 @@ class LineInspirationSkill(HermesSkill):
     """Retrieve individual lines or couplets for rhyme/imagery inspiration."""
 
     name = "retrieve_lines"
-    description = (
-        "检索与主题相关的古人诗句或对联，用于获取韵脚、对仗或意象灵感。"
-    )
+    description = "检索与主题相关的古人诗句或对联，用于获取韵脚、对仗或意象灵感。"
 
     def __init__(self, retriever: Optional[HermesRetriever] = None):
         self.retriever = retriever or get_hermes_retriever()
@@ -116,11 +122,16 @@ class LineInspirationSkill(HermesSkill):
         for item in lines:
             text = item.get("text", "")
             meta = item.get("metadata", {})
-            header = " ".join(filter(None, [
-                meta.get("dynasty"),
-                meta.get("author"),
-                meta.get("title"),
-            ]))
+            header = " ".join(
+                filter(
+                    None,
+                    [
+                        meta.get("dynasty"),
+                        meta.get("author"),
+                        meta.get("title"),
+                    ],
+                )
+            )
             for ln in text.split("\n"):
                 ln = ln.strip()
                 if ln:

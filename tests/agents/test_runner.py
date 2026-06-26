@@ -31,22 +31,25 @@ def fake_registry(fake_tool):
 @pytest.fixture
 def task_reg():
     reg = TaskRegistry()
-    reg.register(TaskConfig(
-        name="demo_task",
-        description="demo",
-        tools=["check_meter"],
-        max_llm_rounds=2,
-        use_rag=False,
-        temperature=0.5,
-    ))
+    reg.register(
+        TaskConfig(
+            name="demo_task",
+            description="demo",
+            tools=["check_meter"],
+            max_llm_rounds=2,
+            use_rag=False,
+            temperature=0.5,
+        )
+    )
     return reg
 
 
 def _fake_llm(content="OUTPUT"):
     llm = MagicMock()
 
-    def chat_with_tools(prompt, tools, system_prompt=None, max_rounds=3,
-                        temperature=0.7, progress_callback=None):
+    def chat_with_tools(
+        prompt, tools, system_prompt=None, max_rounds=3, temperature=0.7, progress_callback=None
+    ):
         if progress_callback:
             progress_callback("thinking", {"round": 1, "max_rounds": max_rounds})
             progress_callback("tool_call", {"tool": "check_meter", "arguments": {"text": "x"}})
@@ -213,13 +216,15 @@ class TestAgentRunner:
 class TestRagAugmentation:
     def test_rag_step_emitted_when_use_rag_true(self, fake_registry, monkeypatch):
         reg = TaskRegistry()
-        reg.register(TaskConfig(
-            name="rag_task",
-            tools=["check_meter"],
-            use_rag=True,
-            rag_task_type="generate_couplet",
-            max_llm_rounds=1,
-        ))
+        reg.register(
+            TaskConfig(
+                name="rag_task",
+                tools=["check_meter"],
+                use_rag=True,
+                rag_task_type="generate_couplet",
+                max_llm_rounds=1,
+            )
+        )
 
         class _StubResultSet:
             def to_prompt_text(self):
@@ -230,6 +235,7 @@ class TestRagAugmentation:
                 return _StubResultSet()
 
         import openprom.knowledge.retrieval.pipeline as pipe_mod
+
         monkeypatch.setattr(pipe_mod, "get_retrieval_pipeline", lambda: _StubPipeline())
 
         runner = AgentRunner(
@@ -244,18 +250,21 @@ class TestRagAugmentation:
 
     def test_rag_failure_does_not_break_run(self, fake_registry, monkeypatch):
         reg = TaskRegistry()
-        reg.register(TaskConfig(
-            name="rag_task",
-            tools=["check_meter"],
-            use_rag=True,
-            rag_task_type="generate_couplet",
-            max_llm_rounds=1,
-        ))
+        reg.register(
+            TaskConfig(
+                name="rag_task",
+                tools=["check_meter"],
+                use_rag=True,
+                rag_task_type="generate_couplet",
+                max_llm_rounds=1,
+            )
+        )
 
         def _boom():
             raise RuntimeError("chroma down")
 
         import openprom.knowledge.retrieval.pipeline as pipe_mod
+
         monkeypatch.setattr(pipe_mod, "get_retrieval_pipeline", _boom)
 
         runner = AgentRunner(
@@ -269,18 +278,21 @@ class TestRagAugmentation:
 
     def test_extra_context_skips_rag(self, fake_registry, monkeypatch):
         reg = TaskRegistry()
-        reg.register(TaskConfig(
-            name="rag_task",
-            tools=["check_meter"],
-            use_rag=True,
-            rag_task_type="generate_couplet",
-            max_llm_rounds=1,
-        ))
+        reg.register(
+            TaskConfig(
+                name="rag_task",
+                tools=["check_meter"],
+                use_rag=True,
+                rag_task_type="generate_couplet",
+                max_llm_rounds=1,
+            )
+        )
 
         def _should_not_call():
             raise AssertionError("RAG should not run when extra_context provided")
 
         import openprom.knowledge.retrieval.pipeline as pipe_mod
+
         monkeypatch.setattr(pipe_mod, "get_retrieval_pipeline", _should_not_call)
 
         runner = AgentRunner(

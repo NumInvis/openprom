@@ -55,12 +55,14 @@ class TaskTrace:
     error: Optional[str] = None
 
     def add_step(self, step_type: str, data: Dict[str, Any], duration_ms: float = 0.0):
-        self.steps.append(TaskStep(
-            step_type=step_type,
-            timestamp=time.time(),
-            data=data,
-            duration_ms=duration_ms,
-        ))
+        self.steps.append(
+            TaskStep(
+                step_type=step_type,
+                timestamp=time.time(),
+                data=data,
+                duration_ms=duration_ms,
+            )
+        )
 
     @property
     def total_duration_ms(self) -> float:
@@ -128,57 +130,68 @@ def get_task_registry() -> TaskRegistry:
     registry = TaskRegistry()
 
     from openprom.infrastructure.config.settings import get_settings
+
     settings = get_settings()
 
-    registry.register(TaskConfig(
-        name="generate_couplet",
-        description="对联生成",
-        tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
-        max_llm_rounds=settings.generation.couplet_max_revision_rounds,
-        use_rag=False,
-        rag_task_type="generate_couplet",
-        temperature=settings.api.temperature_generation,
-    ))
+    registry.register(
+        TaskConfig(
+            name="generate_couplet",
+            description="对联生成",
+            tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
+            max_llm_rounds=settings.generation.couplet_max_revision_rounds,
+            use_rag=False,
+            rag_task_type="generate_couplet",
+            temperature=settings.api.temperature_generation,
+        )
+    )
 
-    registry.register(TaskConfig(
-        name="complete_couplet",
-        description="对联补全",
-        tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
-        max_llm_rounds=settings.generation.couplet_max_revision_rounds,
-        use_rag=False,
-        rag_task_type="generate_couplet",
-        temperature=settings.api.temperature_generation,
-    ))
+    registry.register(
+        TaskConfig(
+            name="complete_couplet",
+            description="对联补全",
+            tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
+            max_llm_rounds=settings.generation.couplet_max_revision_rounds,
+            use_rag=False,
+            rag_task_type="generate_couplet",
+            temperature=settings.api.temperature_generation,
+        )
+    )
 
-    registry.register(TaskConfig(
-        name="generate_shi",
-        description="律诗生成",
-        tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
-        max_llm_rounds=settings.generation.shi_max_revision_rounds,
-        use_rag=False,
-        rag_task_type="generate_shi",
-        temperature=settings.api.temperature_generation,
-    ))
+    registry.register(
+        TaskConfig(
+            name="generate_shi",
+            description="律诗生成",
+            tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
+            max_llm_rounds=settings.generation.shi_max_revision_rounds,
+            use_rag=False,
+            rag_task_type="generate_shi",
+            temperature=settings.api.temperature_generation,
+        )
+    )
 
-    registry.register(TaskConfig(
-        name="complete_shi",
-        description="律诗补全",
-        tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
-        max_llm_rounds=settings.generation.shi_max_revision_rounds,
-        use_rag=False,
-        rag_task_type="generate_shi",
-        temperature=settings.api.temperature_generation,
-    ))
+    registry.register(
+        TaskConfig(
+            name="complete_shi",
+            description="律诗补全",
+            tools=["check_meter", "retrieve_poetry", "web_search", "self_critique"],
+            max_llm_rounds=settings.generation.shi_max_revision_rounds,
+            use_rag=False,
+            rag_task_type="generate_shi",
+            temperature=settings.api.temperature_generation,
+        )
+    )
 
-    registry.register(TaskConfig(
-        name="analyze_couplet",
-        description="对联评分",
-        tools=["check_meter"],
-        max_llm_rounds=2,
-        use_rag=False,
-        use_saddle=True,
-        temperature=settings.api.temperature_technique,
-    ))
+    registry.register(
+        TaskConfig(
+            name="analyze_couplet",
+            description="对联评分",
+            tools=["check_meter"],
+            max_llm_rounds=2,
+            use_rag=False,
+            use_saddle=True,
+            temperature=settings.api.temperature_technique,
+        )
+    )
 
     _global_registry = registry
     return registry

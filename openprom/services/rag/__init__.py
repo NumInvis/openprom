@@ -1,6 +1,10 @@
 """RAG knowledge layer for poetry generation."""
 
-from openprom.services.rag.embeddings import EmbeddingProvider, SentenceTransformerProvider, get_embedding_provider
+from openprom.services.rag.embeddings import (
+    EmbeddingProvider,
+    SentenceTransformerProvider,
+    get_embedding_provider,
+)
 from openprom.services.rag.vector_store import PoetryVectorStore, get_vector_store
 from openprom.services.rag.poetry_knowledge import PoetryKnowledge, get_poetry_knowledge
 

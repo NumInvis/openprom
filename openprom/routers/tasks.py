@@ -27,29 +27,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/tasks", tags=["任务编排"])
 
 
-@router.get("/", response_model=TaskListResponse, summary="列出所有已注册任务")
+@router.get("", response_model=TaskListResponse, summary="列出所有已注册任务")
 async def list_tasks() -> TaskListResponse:
     from openprom.agents import get_task_registry
+
     reg = get_task_registry()
     tasks = []
     for name, cfg in reg.items():
-        tasks.append({
-            "name": cfg.name,
-            "description": cfg.description,
-            "tools": cfg.tools,
-            "max_llm_rounds": cfg.max_llm_rounds,
-            "use_rag": cfg.use_rag,
-            "rag_task_type": cfg.rag_task_type,
-            "use_saddle": cfg.use_saddle,
-            "streaming": cfg.streaming,
-            "temperature": cfg.temperature,
-        })
+        tasks.append(
+            {
+                "name": cfg.name,
+                "description": cfg.description,
+                "tools": cfg.tools,
+                "max_llm_rounds": cfg.max_llm_rounds,
+                "use_rag": cfg.use_rag,
+                "rag_task_type": cfg.rag_task_type,
+                "use_saddle": cfg.use_saddle,
+                "streaming": cfg.streaming,
+                "temperature": cfg.temperature,
+            }
+        )
     return TaskListResponse(tasks=tasks)
 
 
 @router.post("/run", response_model=TaskRunResponse, summary="通过 AgentRunner 执行任务")
 async def run_task(req: TaskRunRequest) -> TaskRunResponse:
     from openprom.agents.runner import get_agent_runner
+
     runner = get_agent_runner()
     try:
         result = runner.run(
@@ -99,6 +103,7 @@ async def list_traces(
 ) -> List[TraceListItem]:
     try:
         from openprom.infrastructure.task_trace import get_task_trace_store
+
         store = get_task_trace_store()
         rows = store.list_recent(limit=limit)
     except Exception as e:
@@ -126,10 +131,13 @@ async def list_traces(
     ]
 
 
-@router.get("/traces/{task_id}", response_model=TraceDetailResponse, summary="单条任务执行的完整轨迹")
+@router.get(
+    "/traces/{task_id}", response_model=TraceDetailResponse, summary="单条任务执行的完整轨迹"
+)
 async def get_trace(task_id: str) -> TraceDetailResponse:
     try:
         from openprom.infrastructure.task_trace import get_task_trace_store
+
         store = get_task_trace_store()
         row = store.get(task_id)
     except Exception as e:
@@ -167,4 +175,5 @@ def _iso(ts):
     if ts is None:
         return None
     from datetime import datetime
+
     return datetime.fromtimestamp(ts).isoformat()

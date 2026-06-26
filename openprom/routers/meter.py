@@ -28,6 +28,7 @@ async def meter_check(request: Request, req: MeterRequest):
 async def meter_list(meter_type: str = "shi"):
     """List available meter patterns."""
     from openprom.data.loader import MeterPattern
+
     patterns = MeterPattern.get()
     if meter_type == "shi":
         return {"meter_type": "shi", "patterns": patterns.list_shi_patterns()}

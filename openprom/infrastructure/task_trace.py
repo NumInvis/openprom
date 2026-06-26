@@ -40,8 +40,7 @@ class TaskTraceStore:
         started = datetime.fromtimestamp(trace.started_at) if trace.started_at else None
         finished = datetime.fromtimestamp(trace.finished_at) if trace.finished_at else None
         steps_data = [
-            {"type": s.step_type, "data": s.data, "duration_ms": s.duration_ms}
-            for s in trace.steps
+            {"type": s.step_type, "data": s.data, "duration_ms": s.duration_ms} for s in trace.steps
         ]
         row = TaskTraceRow(
             task_id=trace.task_id,

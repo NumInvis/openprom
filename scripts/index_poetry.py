@@ -27,7 +27,9 @@ def main():
         help="Path to JSON file or directory (default: openprom/data/poetry_corpus.json)",
     )
     parser.add_argument("--bulk", action="store_true", help="Source is a directory of JSON files")
-    parser.add_argument("--reset", action="store_true", help="Delete existing collection before indexing")
+    parser.add_argument(
+        "--reset", action="store_true", help="Delete existing collection before indexing"
+    )
     args = parser.parse_args()
 
     indexer = PoetryIndexer()

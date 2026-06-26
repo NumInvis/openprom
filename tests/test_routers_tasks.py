@@ -24,10 +24,13 @@ def test_list_tasks():
 
 
 def test_run_task_unknown_returns_404():
-    resp = client.post("/api/v1/tasks/run", json={
-        "task_name": "totally_unknown_task",
-        "user_prompt": "hi",
-    })
+    resp = client.post(
+        "/api/v1/tasks/run",
+        json={
+            "task_name": "totally_unknown_task",
+            "user_prompt": "hi",
+        },
+    )
     assert resp.status_code == 404
 
 
@@ -35,18 +38,28 @@ def test_run_task_success(monkeypatch):
     from openprom.agents.runner import AgentRunner
     from openprom.agents import TaskTrace
 
-    def _fake_run(self, *, task_name, user_prompt, system_prompt=None,
-                  max_rounds_override=None, extra_context=None):
+    def _fake_run(
+        self,
+        *,
+        task_name,
+        user_prompt,
+        system_prompt=None,
+        max_rounds_override=None,
+        extra_context=None,
+    ):
         trace = TaskTrace(task_name=task_name, task_id="t-test123")
         trace.add_step("llm_call", {"round": 1})
         trace.success = True
         return {"content": "FAKE_CONTENT", "messages": [], "trace": trace}
 
     monkeypatch.setattr(AgentRunner, "run", _fake_run)
-    resp = client.post("/api/v1/tasks/run", json={
-        "task_name": "generate_couplet",
-        "user_prompt": "春风",
-    })
+    resp = client.post(
+        "/api/v1/tasks/run",
+        json={
+            "task_name": "generate_couplet",
+            "user_prompt": "春风",
+        },
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["content"] == "FAKE_CONTENT"

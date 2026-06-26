@@ -37,7 +37,7 @@ def get_tool_registry() -> Dict[str, Tool]:
             "  action=check — 格律检测，返回是否合规、匹配率、错误位置、韵脚建议\n"
             "  action=rhyme_candidates — 获取同韵部候选字（需要 char + tone）\n"
             "  action=char_phonetics — 查汉字在平水韵中的声调和韵部（需要 char）\n"
-            "  action=meter_template — 查诗体格律谱（需要 form，如\"七律\"）\n"
+            '  action=meter_template — 查诗体格律谱（需要 form，如"七律"）\n'
             "  action=explain_rule — 解释格律规则（需要 rule）\n"
             "最终交付前必须用 action=check 确保格律合规。"
         ),

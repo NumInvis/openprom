@@ -13,18 +13,15 @@ class TestFeedbackIngestor:
 
     @pytest.fixture()
     def mock_meter_tool(self):
-        with patch(
-            "openprom.knowledge.memory.feedback.check_meter"
-        ) as mock_check_meter:
+        with patch("openprom.knowledge.memory.feedback.check_meter") as mock_check_meter:
             yield mock_check_meter
 
     @pytest.fixture()
     def mock_store_and_embed(self):
-        with patch(
-            "openprom.knowledge.memory.feedback.get_vector_store"
-        ) as mock_get_store, patch(
-            "openprom.knowledge.providers.get_embedding_provider"
-        ) as mock_get_embed:
+        with (
+            patch("openprom.knowledge.memory.feedback.get_vector_store") as mock_get_store,
+            patch("openprom.knowledge.providers.get_embedding_provider") as mock_get_embed,
+        ):
             store = MagicMock()
             mock_get_store.return_value = store
 
@@ -61,9 +58,7 @@ class TestFeedbackIngestor:
         assert result is None
         store.upsert.assert_not_called()
 
-    def test_passing_content_gets_provenance(
-        self, ingestor, mock_meter_tool, mock_store_and_embed
-    ):
+    def test_passing_content_gets_provenance(self, ingestor, mock_meter_tool, mock_store_and_embed):
         mock_meter_tool.return_value = {"is_compliant": True}
         store, embedder = mock_store_and_embed
 

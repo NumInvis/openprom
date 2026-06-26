@@ -35,9 +35,7 @@ class RerankProvider(Protocol):
 
     name: str
 
-    def rerank(
-        self, query: str, docs: List[str], top_k: int = 10
-    ) -> List[Tuple[int, float]]:
+    def rerank(self, query: str, docs: List[str], top_k: int = 10) -> List[Tuple[int, float]]:
         """Rerank docs against query.
 
         Returns: list of (original_index, score) sorted by score desc, length <= top_k.
@@ -50,9 +48,7 @@ class NoOpReranker:
 
     name = "noop"
 
-    def rerank(
-        self, query: str, docs: List[str], top_k: int = 10
-    ) -> List[Tuple[int, float]]:
+    def rerank(self, query: str, docs: List[str], top_k: int = 10) -> List[Tuple[int, float]]:
         return [(i, 1.0 - i * 0.01) for i in range(min(top_k, len(docs)))]
 
 
@@ -64,6 +60,7 @@ class MockEmbeddingProvider:
 
     def embed(self, texts: List[str]) -> NDArray[np.float32]:
         import hashlib
+
         results = []
         for text in texts:
             h = hashlib.md5(text.encode("utf-8")).digest()
@@ -100,6 +97,7 @@ def get_embedding_provider(name: Optional[str] = None) -> EmbeddingProvider:
     # Try requested or configured provider
     if name is None:
         import os
+
         name = os.getenv("OPENPROM_EMBEDDING_PROVIDER", "sentence_transformers")
 
     if name == "sentence_transformers":
@@ -107,6 +105,7 @@ def get_embedding_provider(name: Optional[str] = None) -> EmbeddingProvider:
             from openprom.knowledge.providers.embedding.sentence_transformer import (
                 SentenceTransformerEmbedding,
             )
+
             _embedding_provider = SentenceTransformerEmbedding()
             return _embedding_provider
         except Exception:
@@ -117,6 +116,7 @@ def get_embedding_provider(name: Optional[str] = None) -> EmbeddingProvider:
             from openprom.knowledge.providers.embedding.onnx_provider import (
                 OnnxEmbeddingProvider,
             )
+
             _embedding_provider = OnnxEmbeddingProvider()
             return _embedding_provider
         except Exception:

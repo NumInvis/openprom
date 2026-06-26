@@ -26,9 +26,7 @@ class SentenceTransformerRerankProvider:
         model_path: Optional[str] = None,
         max_length: int = 512,
     ):
-        self.model_name = model_name or os.getenv(
-            "OPENPROM_RERANK_MODEL", _DEFAULT_MODEL
-        )
+        self.model_name = model_name or os.getenv("OPENPROM_RERANK_MODEL", _DEFAULT_MODEL)
         self.model_path = model_path
         self.max_length = max_length
         self._model = None
@@ -44,9 +42,7 @@ class SentenceTransformerRerankProvider:
         self._model = CrossEncoder(model_dir, max_length=self.max_length)
         logger.info("CrossEncoder rerank model loaded: %s", model_dir)
 
-    def rerank(
-        self, query: str, docs: List[str], top_k: int = 10
-    ) -> List[Tuple[int, float]]:
+    def rerank(self, query: str, docs: List[str], top_k: int = 10) -> List[Tuple[int, float]]:
         """Rerank docs against query using CrossEncoder scoring.
 
         Returns list of (original_index, score) sorted by score descending,

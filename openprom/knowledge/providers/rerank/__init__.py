@@ -45,9 +45,7 @@ def get_rerank_factory(name: Optional[str] = None):
             provider._load()
             return provider
         except Exception as exc:
-            logger.warning(
-                "SentenceTransformer rerank provider failed, falling back: %s", exc
-            )
+            logger.warning("SentenceTransformer rerank provider failed, falling back: %s", exc)
 
     from openprom.knowledge.providers import NoOpReranker
 

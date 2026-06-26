@@ -14,16 +14,18 @@ from openprom.engines.pingze import get_sequence
 
 class TonePattern(IntEnum):
     """声调模式编码"""
-    FLEXIBLE = 0      # 0: 可平可仄
-    PING = 1          # 1: 平声
-    ZE = -1           # 2: 仄声 (映射为-1)
-    PING_REQUIRED = 3 # 3: 必须是平
-    ZE_REQUIRED = 4   # 4: 必须是仄
+
+    FLEXIBLE = 0  # 0: 可平可仄
+    PING = 1  # 1: 平声
+    ZE = -1  # 2: 仄声 (映射为-1)
+    PING_REQUIRED = 3  # 3: 必须是平
+    ZE_REQUIRED = 4  # 4: 必须是仄
 
 
 @dataclass
 class MeterMatch:
     """格律匹配结果"""
+
     pattern_name: str
     match_rate: float
     errors: List[Dict]
@@ -76,26 +78,28 @@ class MeterEngine:
 
             if p == TonePattern.PING_REQUIRED:
                 expected_tone = "平"
-                is_match = (t == 1)  # Must be ping, zhong (0) is not acceptable
+                is_match = t == 1  # Must be ping, zhong (0) is not acceptable
             elif p == TonePattern.ZE_REQUIRED:
                 expected_tone = "仄"
-                is_match = (t == -1)  # Must be ze, zhong (0) is not acceptable
+                is_match = t == -1  # Must be ze, zhong (0) is not acceptable
             elif p == TonePattern.PING:
                 expected_tone = "平"
-                is_match = (t == 1 or t == 0)  # Ping or zhong is acceptable
+                is_match = t == 1 or t == 0  # Ping or zhong is acceptable
             elif p == TonePattern.ZE:
                 expected_tone = "仄"
-                is_match = (t == -1 or t == 0)  # Ze or zhong is acceptable
+                is_match = t == -1 or t == 0  # Ze or zhong is acceptable
 
             if is_match:
                 match_count += 1
             elif expected_tone:
-                errors.append({
-                    "pos": i,
-                    "char": text[i],
-                    "expected": expected_tone,
-                    "actual": "平" if t == 1 else "仄" if t == -1 else "中"
-                })
+                errors.append(
+                    {
+                        "pos": i,
+                        "char": text[i],
+                        "expected": expected_tone,
+                        "actual": "平" if t == 1 else "仄" if t == -1 else "中",
+                    }
+                )
 
         if total == 0:
             return 1.0, []
@@ -103,10 +107,7 @@ class MeterEngine:
         return match_count / total, errors
 
     def _match_pattern(
-        self,
-        lines: List[str],
-        pattern: Optional[List[List[int]]],
-        pattern_name: str
+        self, lines: List[str], pattern: Optional[List[List[int]]], pattern_name: str
     ) -> MeterMatch:
         """通用格律匹配
 
@@ -123,17 +124,15 @@ class MeterEngine:
                 pattern_name=pattern_name,
                 match_rate=0.0,
                 errors=[{"error": "pattern not found"}],
-                is_valid=False
+                is_valid=False,
             )
 
         if len(lines) != len(pattern):
             return MeterMatch(
                 pattern_name=pattern_name,
                 match_rate=0.0,
-                errors=[{
-                    "error": f"line count mismatch: {len(lines)} vs {len(pattern)}"
-                }],
-                is_valid=False
+                errors=[{"error": f"line count mismatch: {len(lines)} vs {len(pattern)}"}],
+                is_valid=False,
             )
 
         all_errors = []
@@ -150,10 +149,7 @@ class MeterEngine:
         is_valid = avg_match >= self._threshold
 
         return MeterMatch(
-            pattern_name=pattern_name,
-            match_rate=avg_match,
-            errors=all_errors,
-            is_valid=is_valid
+            pattern_name=pattern_name, match_rate=avg_match, errors=all_errors, is_valid=is_valid
         )
 
     def match_shi(self, lines: List[str], pattern_name: str) -> MeterMatch:
@@ -167,10 +163,7 @@ class MeterEngine:
         return self._match_pattern(lines, pattern, pattern_name)
 
     def find_best_patterns(
-        self,
-        lines: List[str],
-        pattern_type: str,
-        top_k: int = 5
+        self, lines: List[str], pattern_type: str, top_k: int = 5
     ) -> List[MeterMatch]:
         """查找最佳匹配的模式
 

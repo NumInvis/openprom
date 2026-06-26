@@ -8,8 +8,13 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from openprom.routers.common import (
-    CoupletRequest, CoupletResponse, GenerateRequest, GenerateResponse,
-    PormHTTPException, PormErrorCode, get_scorer
+    CoupletRequest,
+    CoupletResponse,
+    GenerateRequest,
+    GenerateResponse,
+    PormHTTPException,
+    PormErrorCode,
+    get_scorer,
 )
 from openprom.services.couplet_generator import CoupletGenerator
 from openprom.infrastructure.cache import get_cache_service
@@ -22,6 +27,7 @@ router = APIRouter(prefix="/api/v1/couplet", tags=["对联"])
 
 def _build_response(score: Any, processing_time_ms: float) -> Dict[str, Any]:
     from openprom.engines.pingze import get_sequence
+
     pingze_upper = get_sequence(score.upper) if score.upper else []
     pingze_lower = get_sequence(score.lower) if score.lower else []
     return {
@@ -48,6 +54,7 @@ def _build_response(score: Any, processing_time_ms: float) -> Dict[str, Any]:
 def _generate_stream(upper: str, lower: str, scorer: Any):
     """Yield SSE events during scoring."""
     import json
+
     start = time.time()
     yield f"data: {json.dumps({'event': 'start', 'upper': upper, 'lower': lower}, ensure_ascii=False)}\n\n"
     try:
@@ -79,6 +86,7 @@ async def couplet_analyze(
     cache = get_cache_service()
     cache_prefix = "couplet"
     import hashlib
+
     cache_key_raw = hashlib.md5(f"{req.upper}|{req.lower}".encode("utf-8")).hexdigest()
     if req.enable_cache:
         cached = cache.get(cache_prefix, cache_key_raw)
@@ -109,6 +117,7 @@ async def couplet_analyze(
     if req.enable_cache:
         try:
             from datetime import timedelta
+
             cache.set(cache_prefix, cache_key_raw, response, ttl=timedelta(seconds=3600))
         except Exception as e:
             logger.warning(f"Failed to cache result: {e}")
@@ -126,7 +135,9 @@ async def couplet_generate(request: Request, req: GenerateRequest):
             media_type="text/event-stream",
         )
     result = generator.generate(req.prompt, req.length, req.max_revision_rounds)
-    return JSONResponse(content={"content": result["couplet"], "raw_content": result["raw_content"]})
+    return JSONResponse(
+        content={"content": result["couplet"], "raw_content": result["raw_content"]}
+    )
 
 
 @router.post("/complete", response_model=GenerateResponse)
@@ -139,7 +150,9 @@ async def couplet_complete(request: Request, req: GenerateRequest):
             media_type="text/event-stream",
         )
     result = generator.complete(req.prompt, req.length, req.max_revision_rounds)
-    return JSONResponse(content={"content": result["couplet"], "raw_content": result["raw_content"]})
+    return JSONResponse(
+        content={"content": result["couplet"], "raw_content": result["raw_content"]}
+    )
 
 
 @router.get("/history")

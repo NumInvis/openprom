@@ -78,35 +78,41 @@ def chunk_record(record: Dict[str, Any]) -> List[Dict[str, Any]]:
     poem_id = str(record["id"])
 
     # Whole poem
-    chunks.append({
-        "id": poem_id,
-        "text": content,
-        "chunk_type": "poem",
-        **base_meta,
-    })
+    chunks.append(
+        {
+            "id": poem_id,
+            "text": content,
+            "chunk_type": "poem",
+            **base_meta,
+        }
+    )
 
     # Couplets (pairs of lines)
     for i in range(0, len(lines) - 1, 2):
-        chunk_lines = lines[i:i + 2]
+        chunk_lines = lines[i : i + 2]
         if len(chunk_lines) == 2:
-            chunks.append({
-                "id": f"{poem_id}_couplet_{i}",
-                "text": "\n".join(chunk_lines),
-                "chunk_type": "couplet",
-                **base_meta,
-            })
+            chunks.append(
+                {
+                    "id": f"{poem_id}_couplet_{i}",
+                    "text": "\n".join(chunk_lines),
+                    "chunk_type": "couplet",
+                    **base_meta,
+                }
+            )
 
     # Quatrains (4-line chunks for 8-line poems)
     if len(lines) >= 8:
         for start in (0, 4):
-            chunk_lines = lines[start:start + 4]
+            chunk_lines = lines[start : start + 4]
             if len(chunk_lines) == 4:
-                chunks.append({
-                    "id": f"{poem_id}_quatrain_{start}",
-                    "text": "\n".join(chunk_lines),
-                    "chunk_type": "quatrain",
-                    **base_meta,
-                })
+                chunks.append(
+                    {
+                        "id": f"{poem_id}_quatrain_{start}",
+                        "text": "\n".join(chunk_lines),
+                        "chunk_type": "quatrain",
+                        **base_meta,
+                    }
+                )
 
     return chunks
 
@@ -170,7 +176,7 @@ def build_and_index(
     # Step 6: Index (batch embedding + upsert)
     total = 0
     for i in range(0, len(all_chunks), BATCH_SIZE):
-        batch = all_chunks[i:i + BATCH_SIZE]
+        batch = all_chunks[i : i + BATCH_SIZE]
         texts = [c["text"] for c in batch]
         ids = [c["id"] for c in batch]
         metadatas = []

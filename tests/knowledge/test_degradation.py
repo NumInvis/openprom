@@ -19,6 +19,7 @@ from openprom.knowledge.schema import Provenance, RetrievalResult, RetrievalResu
 
 # ---- Fixtures ----
 
+
 @pytest.fixture(autouse=True)
 def _reset_providers():
     """Reset provider singletons between tests."""
@@ -60,6 +61,7 @@ def sample_results():
 
 # ---- Embedding degradation ----
 
+
 class TestEmbeddingDegradation:
     """Test that embedding failures degrade gracefully."""
 
@@ -85,12 +87,14 @@ class TestEmbeddingDegradation:
     def test_get_embedding_provider_fallback_to_mock(self):
         """When sentence_transformers is unavailable, should fallback to mock."""
         from openprom.knowledge.providers import get_embedding_provider
+
         provider = get_embedding_provider(name="nonexistent")
         assert isinstance(provider, MockEmbeddingProvider)
 
     def test_embedding_failure_does_not_crash_pipeline(self, mock_store):
         """Pipeline should work even if embedding returns mock data."""
         from openprom.knowledge.retrieval.pipeline import RetrievalPipeline
+
         pipeline = RetrievalPipeline(
             embedding_provider=MockEmbeddingProvider(),
             rerank_provider=NoOpReranker(),
@@ -102,6 +106,7 @@ class TestEmbeddingDegradation:
 
 
 # ---- Rerank degradation ----
+
 
 class TestRerankDegradation:
     """Test that rerank failures degrade gracefully."""
@@ -117,6 +122,7 @@ class TestRerankDegradation:
     def test_get_rerank_provider_fallback_to_noop(self):
         """When rerank model is unavailable, should fallback to NoOp."""
         from openprom.knowledge.providers import get_rerank_provider
+
         provider = get_rerank_provider(name="nonexistent")
         assert isinstance(provider, NoOpReranker)
 
@@ -139,12 +145,14 @@ class TestRerankDegradation:
 
 # ---- Vector store degradation ----
 
+
 class TestVectorStoreDegradation:
     """Test that vector store failures degrade gracefully."""
 
     def test_empty_store_returns_empty_results(self, mock_store):
         """Empty vector store should return empty results, not crash."""
         from openprom.knowledge.retrieval.pipeline import RetrievalPipeline
+
         pipeline = RetrievalPipeline(
             embedding_provider=MockEmbeddingProvider(),
             vector_store=mock_store,
@@ -156,6 +164,7 @@ class TestVectorStoreDegradation:
     def test_store_query_failure_returns_empty(self, mock_store):
         """If store.query raises, pipeline should still return."""
         from openprom.knowledge.retrieval.pipeline import RetrievalPipeline
+
         mock_store.query.side_effect = RuntimeError("connection lost")
 
         pipeline = RetrievalPipeline(
@@ -170,12 +179,14 @@ class TestVectorStoreDegradation:
 
 # ---- Rule signal degradation ----
 
+
 class TestRuleSignalDegradation:
     """Test that rule signal computation degrades gracefully."""
 
     def test_extract_rule_signals_no_form(self):
         """With no target form, signals should return neutral (0.5)."""
         from openprom.knowledge.rule_signals import extract_rule_signals
+
         signals = extract_rule_signals("明月松间照", {}, target_form=None)
         assert signals["form_match"] == 0.5
         assert signals["meter_match"] == 0.5
@@ -184,27 +195,27 @@ class TestRuleSignalDegradation:
     def test_extract_rule_signals_with_form(self):
         """With a target form, form_match should be 0 or 1."""
         from openprom.knowledge.rule_signals import extract_rule_signals
-        signals = extract_rule_signals(
-            "明月松间照", {"form": "五律"}, target_form="五律"
-        )
+
+        signals = extract_rule_signals("明月松间照", {"form": "五律"}, target_form="五律")
         assert signals["form_match"] == 1.0
 
     def test_extract_rule_signals_mismatch_form(self):
         from openprom.knowledge.rule_signals import extract_rule_signals
-        signals = extract_rule_signals(
-            "明月松间照", {"form": "五绝"}, target_form="七律"
-        )
+
+        signals = extract_rule_signals("明月松间照", {"form": "五绝"}, target_form="七律")
         assert signals["form_match"] == 0.0
 
     def test_fuse_with_rule_signals_neutral(self):
         """With all-neutral rule signals, final ≈ semantic score."""
         from openprom.knowledge.rule_signals import fuse_with_rule_signals
+
         result = fuse_with_rule_signals(0.8, {}, w_semantic=0.6, w_rule=0.4)
         # 0.6 * 0.8 + 0.4 * 0.5 = 0.48 + 0.2 = 0.68
         assert abs(result - 0.68) < 0.01
 
 
 # ---- RetrievalResult / ResultSet ----
+
 
 class TestSchemaDegradation:
     """Test schema objects handle missing/empty data gracefully."""

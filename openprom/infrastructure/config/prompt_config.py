@@ -1,5 +1,4 @@
-"""提示词配置管理系统 (Prompt Configuration Management System)
-"""
+"""提示词配置管理系统 (Prompt Configuration Management System)"""
 
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
@@ -13,26 +12,28 @@ import yaml
 
 class PromptType(Enum):
     """提示词类型枚举"""
-    TECHNIQUE_ANALYSIS = auto()     # 技法分析
-    ARTISTIC_ANALYSIS = auto()      # 艺术表现分析
-    IMPRESSION_ANALYSIS = auto()    # 印象评分
-    QUALITY_VALIDATION = auto()     # 质量验证
-    ERROR_CORRECTION = auto()       # 错误修正
-    CONTEXT_ENHANCEMENT = auto()    # 上下文增强
+
+    TECHNIQUE_ANALYSIS = auto()  # 技法分析
+    ARTISTIC_ANALYSIS = auto()  # 艺术表现分析
+    IMPRESSION_ANALYSIS = auto()  # 印象评分
+    QUALITY_VALIDATION = auto()  # 质量验证
+    ERROR_CORRECTION = auto()  # 错误修正
+    CONTEXT_ENHANCEMENT = auto()  # 上下文增强
 
 
 class PromptVersion(Enum):
     """提示词版本策略"""
-    STABLE = "stable"               # 稳定版
-    BETA = "beta"                   # 测试版
-    CANARY = "canary"               # 金丝雀版
-    EXPERIMENTAL = "experimental"   # 实验版
+
+    STABLE = "stable"  # 稳定版
+    BETA = "beta"  # 测试版
+    CANARY = "canary"  # 金丝雀版
+    EXPERIMENTAL = "experimental"  # 实验版
 
 
 @dataclass(frozen=True)
 class PromptTemplate:
     """提示词模板不可变对象
-    
+
     Attributes:
         name: 模板唯一标识名
         template: 模板内容（支持Jinja2语法）
@@ -42,6 +43,7 @@ class PromptTemplate:
         metadata: 元数据（作者、创建时间、标签等）
         checksum: 内容校验和
     """
+
     name: str
     template: str
     version: str
@@ -49,39 +51,37 @@ class PromptTemplate:
     parameters: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
     checksum: str = ""
-    
+
     def __post_init__(self):
         if not self.checksum:
             object.__setattr__(
-                self, 
-                'checksum', 
-                hashlib.sha256(self.template.encode()).hexdigest()[:16]
+                self, "checksum", hashlib.sha256(self.template.encode()).hexdigest()[:16]
             )
-    
+
     def render(self, **kwargs) -> str:
         """渲染模板
-        
+
         Args:
             **kwargs: 模板变量
-            
+
         Returns:
             渲染后的提示词文本
         """
         from jinja2 import Template, StrictUndefined
-        
+
         template = Template(self.template, undefined=StrictUndefined)
         return template.render(**kwargs)
-    
+
     def validate_parameters(self, params: Dict[str, Any]) -> List[str]:
         """验证参数完整性
-        
+
         Args:
             params: 待验证的参数
-            
+
         Returns:
             缺失的参数列表
         """
-        required = set(self.parameters.get('required', []))
+        required = set(self.parameters.get("required", []))
         provided = set(params.keys())
         return list(required - provided)
 
@@ -89,22 +89,23 @@ class PromptTemplate:
 @dataclass
 class PromptConfig:
     """提示词配置对象
-    
+
     包含提示词的所有配置信息，支持多版本管理。
     """
+
     name: str
     prompt_type: PromptType
     versions: Dict[str, PromptTemplate] = field(default_factory=dict)
     active_version: str = ""
     environment: str = "production"
     ab_test_config: Optional[Dict[str, Any]] = None
-    
+
     def get_active(self) -> PromptTemplate:
         """获取当前激活的提示词模板"""
         if not self.active_version or self.active_version not in self.versions:
             raise ValueError(f"Prompt {self.name} has no active version")
         return self.versions[self.active_version]
-    
+
     def get_version(self, version: str) -> PromptTemplate:
         """获取指定版本的提示词模板"""
         if version not in self.versions:
@@ -114,7 +115,7 @@ class PromptConfig:
 
 class PromptConfigService:
     """提示词配置服务
-    
+
     企业级提示词配置管理中心，提供：
     - 提示词的CRUD操作
     - 版本管理与灰度发布
@@ -122,10 +123,10 @@ class PromptConfigService:
     - 配置校验与审计
     - A/B测试支持
     """
-    
-    _instance: Optional['PromptConfigService'] = None
+
+    _instance: Optional["PromptConfigService"] = None
     _lock: Lock = RLock()
-    
+
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -133,12 +134,12 @@ class PromptConfigService:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         with self._lock:
-            if getattr(self, '_initialized', False):
+            if getattr(self, "_initialized", False):
                 return
-            
+
             self._initialized = True
             self._configs: Dict[str, PromptConfig] = {}
             self._watchers: List[Callable] = []
@@ -146,18 +147,18 @@ class PromptConfigService:
             self._last_reload: float = 0
             self._reload_interval: float = 30.0
             self._file_lock = RLock()
-            
+
             # 初始化加载
             self._ensure_config_dir()
             self._load_all_configs()
-    
+
     def _ensure_config_dir(self):
         """确保配置目录存在"""
         self._config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 创建默认提示词文件
         self._create_default_prompts()
-    
+
     def _create_default_prompts(self):
         """创建默认提示词配置"""
         default_prompts = {
@@ -196,9 +197,9 @@ class PromptConfigService:
     "duizhang_type": "正对/反对/流水对"
 }""",
                         "parameters": {"required": ["upper", "lower"]},
-                        "metadata": {"author": "openprom-system", "created_at": "2024-01-01"}
+                        "metadata": {"author": "openprom-system", "created_at": "2024-01-01"},
                     }
-                }
+                },
             },
             "artistic_analysis.yaml": {
                 "name": "artistic_analysis",
@@ -238,9 +239,9 @@ class PromptConfigService:
     "overall_comment": "总体艺术评价"
 }""",
                         "parameters": {"required": ["upper", "lower"]},
-                        "metadata": {"author": "openprom-system", "created_at": "2024-01-01"}
+                        "metadata": {"author": "openprom-system", "created_at": "2024-01-01"},
                     }
-                }
+                },
             },
             "impression_analysis.yaml": {
                 "name": "impression_analysis",
@@ -273,16 +274,14 @@ class PromptConfigService:
     "highlights": ["亮点1", "亮点2"],
     "weaknesses": ["不足1", "不足2"]
 }""",
-                        "parameters": {
-                            "required": ["upper", "lower"]
-                        },
+                        "parameters": {"required": ["upper", "lower"]},
                         "metadata": {
                             "author": "openprom-system",
                             "created_at": "2024-01-01",
-                            "tags": ["impression", "score", "v1"]
-                        }
+                            "tags": ["impression", "score", "v1"],
+                        },
                     }
-                }
+                },
             },
             "quality_validation.yaml": {
                 "name": "quality_validation",
@@ -328,109 +327,104 @@ class PromptConfigService:
     "corrections": {"字段名": "修正值"},
     "final_score": 修正后的总分
 }""",
-                        "parameters": {
-                            "required": ["upper", "lower", "result_json"]
-                        },
+                        "parameters": {"required": ["upper", "lower", "result_json"]},
                         "metadata": {
                             "author": "openprom-system",
                             "created_at": "2024-01-01",
-                            "tags": ["validation", "quality", "v1"]
-                        }
+                            "tags": ["validation", "quality", "v1"],
+                        },
                     }
-                }
-            }
+                },
+            },
         }
-        
+
         for filename, config in default_prompts.items():
             filepath = self._config_dir / filename
             if not filepath.exists():
-                with open(filepath, 'w', encoding='utf-8') as f:
+                with open(filepath, "w", encoding="utf-8") as f:
                     yaml.dump(config, f, allow_unicode=True, sort_keys=False)
-    
+
     def _load_all_configs(self):
         """加载所有提示词配置"""
         with self._file_lock:
             for yaml_file in self._config_dir.glob("*.yaml"):
                 self._load_single_config(yaml_file)
-    
+
     def _load_single_config(self, filepath: Path):
         """加载单个配置文件"""
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            
+
             if not data:
                 return
-            
-            name = data.get('name')
-            prompt_type = PromptType[data.get('prompt_type', 'DUIZHANG_ANALYSIS')]
-            active_version = data.get('active_version', '')
-            
+
+            name = data.get("name")
+            prompt_type = PromptType[data.get("prompt_type", "DUIZHANG_ANALYSIS")]
+            active_version = data.get("active_version", "")
+
             versions = {}
-            for version_str, version_data in data.get('versions', {}).items():
+            for version_str, version_data in data.get("versions", {}).items():
                 template = PromptTemplate(
                     name=name,
-                    template=version_data['template'],
+                    template=version_data["template"],
                     version=version_str,
                     prompt_type=prompt_type,
-                    parameters=version_data.get('parameters', {}),
-                    metadata=version_data.get('metadata', {})
+                    parameters=version_data.get("parameters", {}),
+                    metadata=version_data.get("metadata", {}),
                 )
                 versions[version_str] = template
-            
+
             config = PromptConfig(
-                name=name,
-                prompt_type=prompt_type,
-                versions=versions,
-                active_version=active_version
+                name=name, prompt_type=prompt_type, versions=versions, active_version=active_version
             )
-            
+
             self._configs[name] = config
-            
+
         except Exception as e:
             raise RuntimeError(f"Failed to load prompt config from {filepath}: {e}")
-    
+
     def get_prompt(self, name: str, version: Optional[str] = None) -> PromptTemplate:
         """获取提示词模板
-        
+
         Args:
             name: 提示词名称
             version: 指定版本，None则使用当前激活版本
-            
+
         Returns:
             PromptTemplate对象
         """
         if name not in self._configs:
             raise KeyError(f"Prompt config '{name}' not found")
-        
+
         config = self._configs[name]
-        
+
         if version:
             return config.get_version(version)
         return config.get_active()
-    
+
     def render_prompt(self, name: str, **kwargs) -> str:
         """渲染提示词
-        
+
         Args:
             name: 提示词名称
             **kwargs: 模板变量
-            
+
         Returns:
             渲染后的提示词文本
         """
         template = self.get_prompt(name)
-        
+
         # 验证必需参数
         missing = template.validate_parameters(kwargs)
         if missing:
             raise ValueError(f"Missing required parameters: {missing}")
-        
+
         return template.render(**kwargs)
-    
+
     def reload_config(self, name: Optional[str] = None):
         """重新加载配置
-        
+
         Args:
             name: 指定配置名称，None则重载所有
         """
@@ -441,14 +435,14 @@ class PromptConfigService:
                     self._load_single_config(filepath)
             else:
                 self._load_all_configs()
-        
+
         self._last_reload = time.time()
         self._notify_watchers()
-    
+
     def register_watcher(self, callback: Callable):
         """注册配置变更监听器"""
         self._watchers.append(callback)
-    
+
     def _notify_watchers(self):
         """通知所有监听器"""
         for watcher in self._watchers:
@@ -456,23 +450,23 @@ class PromptConfigService:
                 watcher()
             except Exception:
                 pass
-    
+
     def list_prompts(self) -> List[str]:
         """列出所有提示词名称"""
         return list(self._configs.keys())
-    
+
     def get_prompt_info(self, name: str) -> Dict[str, Any]:
         """获取提示词信息"""
         if name not in self._configs:
             raise KeyError(f"Prompt config '{name}' not found")
-        
+
         config = self._configs[name]
         return {
             "name": config.name,
             "type": config.prompt_type.name,
             "versions": list(config.versions.keys()),
             "active_version": config.active_version,
-            "environment": config.environment
+            "environment": config.environment,
         }
 
 

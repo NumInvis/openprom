@@ -6,7 +6,14 @@
 """
 
 from openprom.engines.pingze import PingZeEngine, PingZeResult, analyze, get_sequence
-from openprom.engines.meter import MeterEngine, MeterMatch, match_shi, match_ci, find_best_shi, find_best_ci
+from openprom.engines.meter import (
+    MeterEngine,
+    MeterMatch,
+    match_shi,
+    match_ci,
+    find_best_shi,
+    find_best_ci,
+)
 
 __all__ = [
     "PingZeEngine",

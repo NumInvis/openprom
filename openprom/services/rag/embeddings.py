@@ -31,6 +31,7 @@ class SentenceTransformerProvider(EmbeddingProvider):
             return
         try:
             from sentence_transformers import SentenceTransformer
+
             logger.info(f"Loading embedding model {self.model_name} on {self.device}")
             self._model = SentenceTransformer(self.model_name, device=self.device)
         except Exception as e:
@@ -53,6 +54,7 @@ class MockEmbeddingProvider(EmbeddingProvider):
 
     def embed(self, texts: List[str]) -> List[List[float]]:
         import hashlib
+
         results = []
         for text in texts:
             h = hashlib.md5(text.encode("utf-8")).digest()

@@ -91,7 +91,9 @@ def test_core_modules():
     assert 0 <= formal_score <= 1, f"formal_score 超出范围: {formal_score}"
     assert 0 <= pingze_score <= 1, f"pingze_score 超出范围: {pingze_score}"
     # formal_score = 0.5*length + 0.3*pingze + 0.2*structure, should differ from pingze
-    assert formal_score != pingze_score, f"formal_score({formal_score}) 应与 pingze_score({pingze_score}) 不同"
+    assert formal_score != pingze_score, (
+        f"formal_score({formal_score}) 应与 pingze_score({pingze_score}) 不同"
+    )
 
     saddle = SaddleEngineering()
     assert saddle._strict_mode is False, "默认应为非严格模式"

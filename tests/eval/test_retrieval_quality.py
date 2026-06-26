@@ -195,9 +195,7 @@ class InMemoryVectorStore:
 
     def _ensure_matrix(self) -> NDArray[np.float32]:
         if self._embeddings_matrix is None:
-            self._embeddings_matrix = np.array(
-                self._collection._embeddings, dtype=np.float32
-            )
+            self._embeddings_matrix = np.array(self._collection._embeddings, dtype=np.float32)
         return self._embeddings_matrix
 
     def query(
@@ -224,12 +222,14 @@ class InMemoryVectorStore:
             if filters:
                 if any(meta.get(k) != v for k, v in filters.items()):
                     continue
-            results.append({
-                "id": self._collection._ids[idx],
-                "text": self._collection._documents[idx],
-                "metadata": meta,
-                "distance": float(1.0 - sims[idx]),
-            })
+            results.append(
+                {
+                    "id": self._collection._ids[idx],
+                    "text": self._collection._documents[idx],
+                    "metadata": meta,
+                    "distance": float(1.0 - sims[idx]),
+                }
+            )
             if len(results) >= top_k:
                 break
         return results
@@ -343,29 +343,35 @@ def generate_qa_pairs(corpus: List[Dict[str, Any]]) -> List[QueryAnswerPair]:
         first_line = poem["paragraphs"][0] if poem["paragraphs"] else ""
 
         # Type 1: title + author
-        pairs.append(QueryAnswerPair(
-            query=f"《{title}》{author}",
-            relevant_ids={pid},
-            query_type="title_author",
-            source_poem_id=pid,
-        ))
+        pairs.append(
+            QueryAnswerPair(
+                query=f"《{title}》{author}",
+                relevant_ids={pid},
+                query_type="title_author",
+                source_poem_id=pid,
+            )
+        )
 
         # Type 2: author name (all poems by this author are relevant)
-        pairs.append(QueryAnswerPair(
-            query=author,
-            relevant_ids=author_poems[author],
-            query_type="author",
-            source_poem_id=pid,
-        ))
+        pairs.append(
+            QueryAnswerPair(
+                query=author,
+                relevant_ids=author_poems[author],
+                query_type="author",
+                source_poem_id=pid,
+            )
+        )
 
         # Type 3: first line
         if first_line:
-            pairs.append(QueryAnswerPair(
-                query=first_line,
-                relevant_ids={pid},
-                query_type="first_line",
-                source_poem_id=pid,
-            ))
+            pairs.append(
+                QueryAnswerPair(
+                    query=first_line,
+                    relevant_ids={pid},
+                    query_type="first_line",
+                    source_poem_id=pid,
+                )
+            )
 
     return pairs
 
@@ -401,13 +407,15 @@ def loaded_store(embedding_provider: MockEmbeddingProvider) -> InMemoryVectorSto
         full_text = "\n".join(poem["paragraphs"])
         ids.append(poem["id"])
         documents.append(full_text)
-        metadatas.append({
-            "title": poem["title"],
-            "author": poem["author"],
-            "dynasty": poem.get("dynasty", ""),
-            "form": poem.get("form", ""),
-            "source": "tang300",
-        })
+        metadatas.append(
+            {
+                "title": poem["title"],
+                "author": poem["author"],
+                "dynasty": poem.get("dynasty", ""),
+                "form": poem.get("form", ""),
+                "source": "tang300",
+            }
+        )
 
     embeddings = emb_provider.embed(documents)
     store.upsert(ids, embeddings, metadatas, documents)
@@ -494,7 +502,9 @@ class TestQAPairGeneration:
         assert types == {"title_author", "author", "first_line"}
 
     def test_title_author_format(self, qa_pairs):
-        pair = next(p for p in qa_pairs if p.query_type == "title_author" and p.source_poem_id == "poem_001")
+        pair = next(
+            p for p in qa_pairs if p.query_type == "title_author" and p.source_poem_id == "poem_001"
+        )
         assert pair.query == "《静夜思》李白"
         assert pair.relevant_ids == {"poem_001"}
 
@@ -506,7 +516,9 @@ class TestQAPairGeneration:
             assert p.relevant_ids == {"poem_001", "poem_005", "poem_008"}
 
     def test_first_line_query(self, qa_pairs):
-        pair = next(p for p in qa_pairs if p.query_type == "first_line" and p.source_poem_id == "poem_009")
+        pair = next(
+            p for p in qa_pairs if p.query_type == "first_line" and p.source_poem_id == "poem_009"
+        )
         assert "明月几时有" in pair.query
 
 
@@ -626,7 +638,9 @@ class TestReport:
         for qtype in sorted(results_by_type):
             metrics = results_by_type[qtype]
             lines.append(f"  [{qtype}]  ({len(qa_pairs) // len(results_by_type)} queries)")
-            for metric_name in [f"R@{k}" for k in self.K_VALUES] + ["MRR"] + [f"nDCG@{k}" for k in self.K_VALUES]:
+            for metric_name in (
+                [f"R@{k}" for k in self.K_VALUES] + ["MRR"] + [f"nDCG@{k}" for k in self.K_VALUES]
+            ):
                 vals = metrics.get(metric_name, [])
                 avg = sum(vals) / len(vals) if vals else 0.0
                 lines.append(f"    {metric_name:>8s} : {avg:.4f}")

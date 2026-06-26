@@ -13,13 +13,8 @@ from typing import Optional, List, Any, Dict
 from contextlib import contextmanager
 from functools import lru_cache
 
-from sqlalchemy import (
-    create_engine, Column, Integer, String, Float,
-    DateTime, JSON, Index, func
-)
-from sqlalchemy.orm import (
-    declarative_base, sessionmaker
-)
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, Index, func
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from openprom.utils.env_config import get_database_url
@@ -31,12 +26,13 @@ Base = declarative_base()
 
 class CoupletAnalysis(Base):
     """对联分析记录"""
+
     __tablename__ = "couplet_analyses"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     upper = Column(String(200), nullable=False, index=True)
     lower = Column(String(200), nullable=False, index=True)
-    
+
     formal_score = Column(Float, default=0.0)
     technique_score = Column(Float, default=0.0)
     artistic_score = Column(Float, default=0.0)
@@ -44,26 +40,26 @@ class CoupletAnalysis(Base):
     total_score = Column(Float, default=0.0)
     grade = Column(String(20), default="")
     pingze_score = Column(Float, default=0.0)
-    
+
     llm_evaluation = Column(JSON, default=dict)
     warnings = Column(JSON, default=list)
     comments = Column(JSON, default=dict)
-    
+
     session_id = Column(String(64), nullable=True, index=True)
     request_id = Column(String(64), nullable=True, index=True)
     is_public = Column(Integer, default=0)
     favorite = Column(Integer, default=0)
     tags = Column(JSON, default=list)
-    
+
     created_at = Column(DateTime, default=datetime.now, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    
+
     __table_args__ = (
-        Index('idx_scores', 'total_score', 'grade'),
-        Index('idx_created', 'created_at'),
-        Index('idx_session', 'session_id'),
+        Index("idx_scores", "total_score", "grade"),
+        Index("idx_created", "created_at"),
+        Index("idx_session", "session_id"),
     )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
@@ -81,9 +77,9 @@ class CoupletAnalysis(Base):
             "warnings": self.warnings,
             "comments": self.comments,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
-    
+
     @classmethod
     def from_score(cls, score_result, **kwargs) -> "CoupletAnalysis":
         """从评分结果创建记录"""
@@ -99,18 +95,19 @@ class CoupletAnalysis(Base):
             pingze_score=score_result.pingze_score,
             llm_evaluation={
                 "technique": score_result.llm_technique_evaluation,
-                "rhetoric": score_result.llm_rhetoric_evaluation
+                "rhetoric": score_result.llm_rhetoric_evaluation,
             },
             warnings=score_result.warnings,
             comments=score_result.comments,
-            **kwargs
+            **kwargs,
         )
 
 
 class MeterCheck(Base):
     """格律检测记录"""
+
     __tablename__ = "meter_checks"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     text = Column(String(500), nullable=False)
     meter_type = Column(String(20), nullable=False)
@@ -119,13 +116,11 @@ class MeterCheck(Base):
     pingze_sequence = Column(JSON, default=list)
     violations = Column(JSON, default=list)
     is_compliant = Column(Integer, default=1)
-    
+
     created_at = Column(DateTime, default=datetime.now, index=True)
-    
-    __table_args__ = (
-        Index('idx_meter_type', 'meter_type', 'is_compliant'),
-    )
-    
+
+    __table_args__ = (Index("idx_meter_type", "meter_type", "is_compliant"),)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -136,14 +131,15 @@ class MeterCheck(Base):
             "pingze_sequence": self.pingze_sequence,
             "violations": self.violations,
             "is_compliant": bool(self.is_compliant),
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 
 class UserSession(Base):
     """用户会话"""
+
     __tablename__ = "user_sessions"
-    
+
     id = Column(String(64), primary_key=True)
     created_at = Column(DateTime, default=datetime.now)
     last_active = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -153,8 +149,9 @@ class UserSession(Base):
 
 class UserFeedback(Base):
     """用户反馈"""
+
     __tablename__ = "user_feedbacks"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(64), index=True, nullable=True)
     analysis_id = Column(Integer, index=True, nullable=True)
@@ -165,8 +162,9 @@ class UserFeedback(Base):
 
 class DailyBest(Base):
     """每日佳作"""
+
     __tablename__ = "daily_bests"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(String(10), index=True, unique=True)
     analysis_id = Column(Integer, nullable=True)
@@ -176,29 +174,25 @@ class DailyBest(Base):
 
 class DatabaseManager:
     """数据库管理器"""
-    
+
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or get_database_url()
         logger.info(f"使用数据库：{self.database_url}")
-        
+
         connect_args = {}
         if self.database_url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
-        
+
         self.engine = create_engine(
             self.database_url,
             connect_args=connect_args,
             poolclass=StaticPool if self.database_url.startswith("sqlite") else None,
-            echo=False
+            echo=False,
         )
-        
-        SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine
-        )
+
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.SessionLocal = SessionLocal
-    
+
     def create_tables(self):
         """创建所有表"""
         logger.info("创建数据库表...")
@@ -209,12 +203,12 @@ class DatabaseManager:
             pass
         Base.metadata.create_all(bind=self.engine)
         logger.info("数据库表创建完成")
-    
+
     def drop_tables(self):
         """删除所有表（慎用）"""
         logger.warning("删除所有数据库表...")
         Base.metadata.drop_all(bind=self.engine)
-    
+
     @contextmanager
     def get_session(self):
         """获取数据库会话上下文"""
@@ -228,7 +222,7 @@ class DatabaseManager:
             raise
         finally:
             session.close()
-    
+
     def save_couplet_analysis(self, score_result, **kwargs) -> CoupletAnalysis:
         """保存对联分析结果"""
         with self.get_session() as session:
@@ -239,7 +233,7 @@ class DatabaseManager:
             # Detach from session so it can be used after context exits
             session.expunge(record)
             return record
-    
+
     def get_couplet_analysis(self, record_id: int) -> Optional[CoupletAnalysis]:
         """获取对联分析记录"""
         with self.get_session() as session:
@@ -247,64 +241,57 @@ class DatabaseManager:
             if record:
                 session.expunge(record)
             return record
-    
+
     def get_couplet_history(
-        self,
-        limit: int = 50,
-        offset: int = 0,
-        session_id: Optional[str] = None
+        self, limit: int = 50, offset: int = 0, session_id: Optional[str] = None
     ) -> List[CoupletAnalysis]:
         """获取历史记录"""
         with self.get_session() as session:
             query = session.query(CoupletAnalysis)
             if session_id is not None:
                 query = query.filter(CoupletAnalysis.session_id == session_id)
-            records = query\
-                .order_by(CoupletAnalysis.created_at.desc())\
-                .offset(offset)\
-                .limit(limit)\
-                .all()
+            records = (
+                query.order_by(CoupletAnalysis.created_at.desc()).offset(offset).limit(limit).all()
+            )
             for r in records:
                 session.expunge(r)
             return records
-    
-    def search_couplets(
-        self,
-        keyword: str,
-        limit: int = 20
-    ) -> List[CoupletAnalysis]:
+
+    def search_couplets(self, keyword: str, limit: int = 20) -> List[CoupletAnalysis]:
         """搜索对联"""
         with self.get_session() as session:
             pattern = f"%{keyword}%"
-            records = session.query(CoupletAnalysis)\
+            records = (
+                session.query(CoupletAnalysis)
                 .filter(
-                    (CoupletAnalysis.upper.like(pattern)) |
-                    (CoupletAnalysis.lower.like(pattern))
-                )\
-                .order_by(CoupletAnalysis.created_at.desc())\
-                .limit(limit)\
+                    (CoupletAnalysis.upper.like(pattern)) | (CoupletAnalysis.lower.like(pattern))
+                )
+                .order_by(CoupletAnalysis.created_at.desc())
+                .limit(limit)
                 .all()
+            )
             for r in records:
                 session.expunge(r)
             return records
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息"""
         with self.get_session() as session:
             total = session.query(func.count(CoupletAnalysis.id)).scalar()
             avg_score = session.query(func.avg(CoupletAnalysis.total_score)).scalar()
-            
-            grade_dist = session.query(
-                CoupletAnalysis.grade,
-                func.count(CoupletAnalysis.id)
-            ).group_by(CoupletAnalysis.grade).all()
-            
+
+            grade_dist = (
+                session.query(CoupletAnalysis.grade, func.count(CoupletAnalysis.id))
+                .group_by(CoupletAnalysis.grade)
+                .all()
+            )
+
             return {
                 "total_analyses": total or 0,
                 "average_score": round(avg_score, 2) if avg_score else 0.0,
-                "grade_distribution": dict(grade_dist)
+                "grade_distribution": dict(grade_dist),
             }
-    
+
     def save_meter_check(self, meter_result: dict) -> MeterCheck:
         """保存格律检测结果"""
         with self.get_session() as session:
@@ -315,13 +302,11 @@ class DatabaseManager:
                 match_rate=meter_result.get("match_rate", 0.0),
                 pingze_sequence=meter_result.get("pingze_sequence", []),
                 violations=meter_result.get("violations", []),
-                is_compliant=1 if meter_result.get("is_compliant", True) else 0
+                is_compliant=1 if meter_result.get("is_compliant", True) else 0,
             )
             session.add(record)
             session.flush()
             return record
-
-
 
 
 @lru_cache(maxsize=1)

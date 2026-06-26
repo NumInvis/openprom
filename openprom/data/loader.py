@@ -19,7 +19,7 @@ class RhymeBook:
     支持多韵书查询，默认使用《平水韵》。
     """
 
-    _instance: Optional['RhymeBook'] = None
+    _instance: Optional["RhymeBook"] = None
     _data: Optional[Dict] = None
     _lock: threading.Lock = threading.Lock()
     _loaded: bool = False
@@ -32,7 +32,7 @@ class RhymeBook:
         return cls._instance
 
     @classmethod
-    def get(cls) -> 'RhymeBook':
+    def get(cls) -> "RhymeBook":
         """获取单例实例（线程安全）"""
         if cls._instance is None:
             cls()
@@ -72,7 +72,7 @@ class RhymeBook:
             return None
 
         ping_list = book_data[0]  # 平声韵部
-        ze_list = book_data[1]    # 仄声韵部
+        ze_list = book_data[1]  # 仄声韵部
 
         # 在平声韵部中查找
         for category in ping_list:
@@ -126,7 +126,8 @@ class RhymeBook:
                 "name": book,
                 "ping_categories": len(book_data[0]),
                 "ze_categories": len(book_data[1]),
-                "total_chars": sum(len(c) for c in book_data[0]) + sum(len(c) for c in book_data[1])
+                "total_chars": sum(len(c) for c in book_data[0])
+                + sum(len(c) for c in book_data[1]),
             }
         return None
 
@@ -137,7 +138,7 @@ class MeterPattern:
     管理诗体（五律、七律等）和词牌（蝶恋花、浣溪沙等）的格律模式。
     """
 
-    _instance: Optional['MeterPattern'] = None
+    _instance: Optional["MeterPattern"] = None
     _shi_data: Optional[Dict[str, str]] = None
     _ci_data: Optional[Dict[str, str]] = None
     _lock: threading.Lock = threading.Lock()
@@ -145,11 +146,11 @@ class MeterPattern:
 
     # 模式编码映射
     _PATTERN_MAP = {
-        '0': 0,   # 可平可仄
-        '1': 1,   # 平声
-        '2': -1,  # 仄声
-        '3': 3,   # 必须是平
-        '4': 4,   # 必须是仄
+        "0": 0,  # 可平可仄
+        "1": 1,  # 平声
+        "2": -1,  # 仄声
+        "3": 3,  # 必须是平
+        "4": 4,  # 必须是仄
     }
 
     def __new__(cls):
@@ -160,7 +161,7 @@ class MeterPattern:
         return cls._instance
 
     @classmethod
-    def get(cls) -> 'MeterPattern':
+    def get(cls) -> "MeterPattern":
         """获取单例实例（线程安全）"""
         if cls._instance is None:
             cls()
@@ -190,7 +191,7 @@ class MeterPattern:
             raise FileNotFoundError(f"词谱数据文件不存在: {ci_path}")
         except json.JSONDecodeError as e:
             raise ValueError(f"词谱数据格式错误: {e}")
-        
+
         cls._loaded = True
 
     def _parse_pattern(self, pattern_str: str) -> List[List[int]]:

@@ -7,8 +7,7 @@ from playwright.sync_api import sync_playwright, expect, TimeoutError as Playwri
 
 
 @pytest.mark.skipif(
-    os.getenv("SKIP_PLAYWRIGHT", "false").lower() == "true",
-    reason="设置了 SKIP_PLAYWRIGHT"
+    os.getenv("SKIP_PLAYWRIGHT", "false").lower() == "true", reason="设置了 SKIP_PLAYWRIGHT"
 )
 def test_web_interface():
     """测试 Web 界面的所有功能"""
@@ -28,7 +27,7 @@ def test_web_interface():
 
         try:
             page.goto("http://localhost:8000", wait_until="networkidle", timeout=30000)
-            expect(page.locator(".logo-title")).to_be_visible(timeout=5000)
+            expect(page.locator(".brand-title")).to_be_visible(timeout=5000)
 
             page.screenshot(path="tests/screenshots/01_initial_page.png", full_page=True)
 
@@ -59,10 +58,10 @@ def test_web_interface():
             upper_input.fill("春风化雨")
             lower_input.fill("秋月寒霜")
 
-            context.set_viewport_size({"width": 375, "height": 667})
+            page.set_viewport_size({"width": 375, "height": 667})
             page.screenshot(path="tests/screenshots/04_mobile_view.png")
 
-            context.set_viewport_size({"width": 1920, "height": 1080})
+            page.set_viewport_size({"width": 1920, "height": 1080})
 
             header = page.locator(".header")
             if header.is_visible():

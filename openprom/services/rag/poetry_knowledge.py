@@ -17,6 +17,7 @@ class PoetryKnowledge:
     def __init__(self, retriever=None):
         if retriever is None:
             from openprom.services.hermes.retriever import get_hermes_retriever
+
             retriever = get_hermes_retriever()
         self.retriever = retriever
 
@@ -76,7 +77,9 @@ class PoetryKnowledge:
         for p in poems:
             text = p.get("text", "")
             meta = p.get("metadata", {})
-            header = " ".join(filter(None, [meta.get("dynasty"), meta.get("author"), meta.get("title")]))
+            header = " ".join(
+                filter(None, [meta.get("dynasty"), meta.get("author"), meta.get("title")])
+            )
             if text:
                 notes.append(f"- {header or '古人'}：{text.replace(chr(10), ' / ')}")
         return "\n".join(["【意象与用词参考】"] + notes)
