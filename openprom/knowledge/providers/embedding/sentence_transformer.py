@@ -47,7 +47,7 @@ class SentenceTransformerEmbedding:
             self._model = SentenceTransformer(self.model_name, device=self.device)
             # Update dim from loaded model
             try:
-                self.dim = self._model.get_sentence_embedding_dimension()
+                self.dim = self._model.get_embedding_dimension()
             except Exception:
                 pass
         except Exception as e:

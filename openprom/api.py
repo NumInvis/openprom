@@ -109,7 +109,13 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def _handle_validation_exception(_: Request, exc: RequestValidationError):
+    async def _handle_validation_exception(request: Request, exc: RequestValidationError):
+        logger.warning(
+            "Request validation failed: path=%s errors=%s body_preview=%s",
+            request.url.path,
+            exc.errors(),
+            (await request.body())[:500] if hasattr(request, "body") else "N/A",
+        )
         return JSONResponse(
             status_code=422,
             content={

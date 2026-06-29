@@ -85,11 +85,18 @@ class TestEmbeddingDegradation:
         assert (r1 == r2).all()
 
     def test_get_embedding_provider_fallback_to_mock(self):
-        """When sentence_transformers is unavailable, should fallback to mock."""
+        """When sentence_transformers is unavailable, should fallback to mock (or raise in strict mode)."""
+        import os
         from openprom.knowledge.providers import get_embedding_provider
 
-        provider = get_embedding_provider(name="nonexistent")
-        assert isinstance(provider, MockEmbeddingProvider)
+        if os.getenv("OPENPROM_EMBEDDING_PROVIDER"):
+            # Strict mode: should raise when provider unavailable
+            with pytest.raises(RuntimeError):
+                get_embedding_provider(name="nonexistent")
+        else:
+            # Legacy mode: should fallback to mock
+            provider = get_embedding_provider(name="nonexistent")
+            assert isinstance(provider, MockEmbeddingProvider)
 
     def test_embedding_failure_does_not_crash_pipeline(self, mock_store):
         """Pipeline should work even if embedding returns mock data."""

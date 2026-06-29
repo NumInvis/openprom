@@ -89,42 +89,58 @@ def get_embedding_provider(name: Optional[str] = None) -> EmbeddingProvider:
     """Get or create the singleton embedding provider.
 
     Fallback chain: requested → sentence_transformers → mock.
+    When OPENPROM_EMBEDDING_PROVIDER is explicitly set, failures are raised
+    instead of silently falling back to MockEmbeddingProvider.
     """
     global _embedding_provider
     if _embedding_provider is not None and (name is None or _embedding_provider.name == name):
         return _embedding_provider
 
-    # Try requested or configured provider
-    if name is None:
-        import os
+    import os
 
+    if name is None:
         name = os.getenv("OPENPROM_EMBEDDING_PROVIDER", "sentence_transformers")
 
-    if name == "sentence_transformers":
-        try:
-            from openprom.knowledge.providers.embedding.sentence_transformer import (
-                SentenceTransformerEmbedding,
-            )
+    explicit_provider = os.getenv("OPENPROM_EMBEDDING_PROVIDER") is not None
 
+    if name == "sentence_transformers":
+        from openprom.knowledge.providers.embedding.sentence_transformer import (
+            SentenceTransformerEmbedding,
+        )
+
+        try:
             _embedding_provider = SentenceTransformerEmbedding()
             return _embedding_provider
-        except Exception:
+        except Exception as e:
+            if explicit_provider:
+                raise RuntimeError(
+                    f"Embedding provider '{name}' failed to load and strict mode is enabled (OPENPROM_EMBEDDING_PROVIDER set). Error: {e}"
+                ) from e
             pass
 
     if name == "onnx":
-        try:
-            from openprom.knowledge.providers.embedding.onnx_provider import (
-                OnnxEmbeddingProvider,
-            )
+        from openprom.knowledge.providers.embedding.onnx_provider import (
+            OnnxEmbeddingProvider,
+        )
 
+        try:
             _embedding_provider = OnnxEmbeddingProvider()
             return _embedding_provider
-        except Exception:
+        except Exception as e:
+            if explicit_provider:
+                raise RuntimeError(
+                    f"Embedding provider '{name}' failed to load and strict mode is enabled (OPENPROM_EMBEDDING_PROVIDER set). Error: {e}"
+                ) from e
             pass
 
-    # Fallback
-    _embedding_provider = MockEmbeddingProvider()
-    return _embedding_provider
+    # Fallback only when no explicit provider was configured
+    if not explicit_provider:
+        _embedding_provider = MockEmbeddingProvider()
+        return _embedding_provider
+
+    raise RuntimeError(
+        f"Embedding provider '{name}' is not available and no fallback is allowed (OPENPROM_EMBEDDING_PROVIDER set)."
+    )
 
 
 def get_rerank_provider(name: Optional[str] = None) -> RerankProvider:
