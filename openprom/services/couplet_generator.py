@@ -155,12 +155,29 @@ class CoupletGenerator:
         else:
             user_prompt = f"上联：{theme}\n需要补全{length}字下联。请搜集灵感。"
 
+        def progress_cb(event: str, payload: Dict[str, Any]) -> None:
+            """Map chat_with_tools events to trace steps for observability."""
+            if event == "tool_call":
+                trace.add_step(
+                    "tool_call",
+                    {"tool": payload.get("tool"), "arguments": payload.get("arguments")},
+                )
+            elif event == "tool_result":
+                last = trace.steps[-1] if trace.steps else None
+                if last and last.step_type == "tool_call":
+                    result = payload.get("result")
+                    if isinstance(result, dict):
+                        last.data["result_preview"] = str(result)[:200]
+                    else:
+                        last.data["result_preview"] = str(result)[:200]
+
         result = self._client.chat_with_tools(
             prompt=user_prompt,
             tools=self._tools,
             system_prompt=_INSPIRE_PROMPT,
             max_rounds=2,
             temperature=0.7,
+            progress_callback=progress_cb,
         )
 
         content = result.get("content", "")
@@ -220,11 +237,16 @@ class CoupletGenerator:
 
     # -- Phase 3: Refine -------------------------------------------------
 
-    def _phase_refine(self, draft: str, meter_type: str, trace) -> str:
-        """Verify meter and apply targeted fixes. Max 2 rounds."""
+    def _phase_refine(self, draft: str, meter_type: str, trace, max_rounds: int = 2) -> str:
+        """Verify meter and apply targeted fixes.
+
+        ``max_rounds`` caps the number of check→fix iterations. Defaults to 2
+        to preserve historical behavior when callers don't pass it explicitly.
+        """
         from openprom.tools.poetry_tools import check_meter_unified
 
-        for round_idx in range(2):
+        rounds = max(1, int(max_rounds or 2))
+        for round_idx in range(rounds):
             check = check_meter_unified(action="check", text=draft, meter_type=meter_type)
 
             if check.get("is_compliant"):
@@ -291,7 +313,9 @@ class CoupletGenerator:
         try:
             inspiration = self._phase_inspire(prompt, "generate", length, trace)
             draft = self._phase_create(prompt, "generate", length, inspiration, trace)
-            final = self._phase_refine(draft, "couplet", trace)
+            final = self._phase_refine(
+                draft, "couplet", trace, max_rounds=max_rounds or settings.generation.couplet_max_revision_rounds
+            )
 
             normalized = _normalize_result(final)
             trace.success = True
@@ -331,7 +355,9 @@ class CoupletGenerator:
         try:
             inspiration = self._phase_inspire(prompt, "complete", length, trace)
             draft = self._phase_create(prompt, "complete", length, inspiration, trace)
-            final = self._phase_refine(draft, "couplet", trace)
+            final = self._phase_refine(
+                draft, "couplet", trace, max_rounds=max_rounds or settings.generation.couplet_max_revision_rounds
+            )
 
             normalized = _normalize_result(final)
             trace.success = True

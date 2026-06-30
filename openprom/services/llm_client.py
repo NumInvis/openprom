@@ -53,6 +53,33 @@ class LLMClient:
                 self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         return self._client
 
+    def _is_retryable(self, exc: Exception) -> bool:
+        """Return True for transient errors worth retrying.
+
+        Non-retryable: 400 BadRequest, 401/403 auth, 404 not found, 422
+        content policy. Retryable: 429 rate limit, 5xx server, timeout,
+        connection errors.
+        """
+        # Import lazily so a missing/renamed openai submodule never breaks startup.
+        try:
+            from openai import (
+                APIError,
+                APIConnectionError,
+                APITimeoutError,
+                RateLimitError,
+                InternalServerError,
+            )
+        except Exception:
+            return True  # can't classify — be permissive
+
+        # Auth / client errors that won't fix themselves on retry.
+        if isinstance(exc, (APIError,)):
+            status = getattr(exc, "status_code", None)
+            if status is not None and 400 <= status < 500 and status != 429:
+                return False
+        # Explicitly transient types.
+        return isinstance(exc, (APIConnectionError, APITimeoutError, RateLimitError, InternalServerError))
+
     def _call(
         self,
         messages: List[Dict[str, str]],
@@ -75,7 +102,7 @@ class LLMClient:
             kwargs["tool_choice"] = tool_choice or "auto"
 
         max_retries = self._settings.api.max_retries
-        retry_delay = self._settings.api.retry_delay
+        base_delay = self._settings.api.retry_delay
 
         last_error: Optional[Exception] = None
         for attempt in range(max_retries):
@@ -83,9 +110,17 @@ class LLMClient:
                 return client.chat.completions.create(**kwargs)
             except Exception as e:
                 last_error = e
-                logger.warning(f"LLM call failed (attempt {attempt + 1}/{max_retries}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
+                if not self._is_retryable(e) or attempt >= max_retries - 1:
+                    raise
+                # Exponential backoff with jitter: base * 2^attempt + random.
+                import random
+
+                delay = base_delay * (2 ** attempt) + random.uniform(0, base_delay * 0.5)
+                logger.warning(
+                    f"LLM call failed (attempt {attempt + 1}/{max_retries}), "
+                    f"retrying in {delay:.1f}s: {e}"
+                )
+                time.sleep(delay)
         raise RuntimeError(f"LLM call failed after {max_retries} attempts: {last_error}")
 
     def chat(

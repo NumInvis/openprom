@@ -154,11 +154,12 @@ def main():
     """CLI entrypoint."""
     import uvicorn
 
+    reload = is_debug()
     uvicorn.run(
-        "openprom.api:app",
+        app if not reload else "openprom.api:app",
         host=get_host(),
         port=get_port(),
-        reload=is_debug(),
+        reload=reload,
     )
 
 

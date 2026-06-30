@@ -13,6 +13,11 @@ from pathlib import Path
 # Allow running from project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Load .env so OPENPROM_EMBEDDING_MODEL points to the local model cache
+# instead of triggering a HuggingFace download when run as a standalone script.
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from openprom.infrastructure.logging import setup_logging
 from openprom.services.hermes import PoetryIndexer
 

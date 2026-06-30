@@ -54,17 +54,46 @@ _COMMON_CHAR_RANK: Dict[str, int] = {
 
 
 def _normalize_text(text: str) -> str:
-    """Normalize punctuation and whitespace."""
-    # Keep newlines to separate lines; strip common punctuation.
+    """Normalize punctuation and whitespace for a single line."""
     import re
 
     text = re.sub(r"[，。、；：！？\"“”‘’()（）【】]", "", text)
     return text.strip()
 
 
-def _split_lines(text: str) -> List[str]:
-    """Split text into lines for shi/ci; for couplet use first two lines."""
-    lines = [line.strip() for line in text.split("\n") if line.strip()]
+def _split_lines(text: str, meter_type: str = "shi") -> List[str]:
+    """Split text into lines for shi/ci; for couplet use first two lines.
+
+    For shi/ci: if the text already contains newlines, honor them; otherwise
+    split on Chinese clause/sentence punctuation (，。、；！？) so users can
+    paste a poem as a single line like "白日依山尽，黄河入海流。欲穷千里目，
+    更上一层楼。" and still get one line per clause. Punctuation is stripped
+    from each line afterwards by ``_normalize_text``.
+    """
+    import re
+
+    raw_lines = [line for line in text.split("\n")]
+    if not raw_lines:
+        return []
+
+    if meter_type == "couplet":
+        # Couplet: only newlines separate upper/lower; keep commas inside.
+        return [line.strip() for line in raw_lines if line.strip()]
+
+    # shi / ci: split each raw line on clause/sentence punctuation.
+    lines: List[str] = []
+    for line in raw_lines:
+        if not line.strip():
+            continue
+        # Split on ，。、；！？,?! — each segment is one poem line.
+        parts = re.split(r"[，。、；！？,?!]", line)
+        for p in parts:
+            p = p.strip()
+            if p:
+                lines.append(p)
+    if not lines:
+        lines = [text.strip()]
+
     return lines
 
 
@@ -150,10 +179,13 @@ def check_meter(
         else settings.tools.meter_match_rate_threshold
     )
 
-    text = _normalize_text(text)
-    lines = _split_lines(text)
+    # Split into lines BEFORE stripping punctuation so sentence-end marks can
+    # act as line separators; then normalize each line.
+    lines = _split_lines(text, meter_type)
+    lines = [_normalize_text(line) for line in lines if _normalize_text(line)]
+    normalized_text = "\n".join(lines)
     result: Dict[str, Any] = {
-        "text": text,
+        "text": normalized_text,
         "meter_type": meter_type,
         "pingze_sequence": [],
         "matched_meters": [],

@@ -146,12 +146,29 @@ class ShiGenerator:
                 f"已给出内容：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集补全灵感。"
             )
 
+        def progress_cb(event: str, payload: Dict[str, Any]) -> None:
+            """Map chat_with_tools events to trace steps for observability."""
+            if event == "tool_call":
+                trace.add_step(
+                    "tool_call",
+                    {"tool": payload.get("tool"), "arguments": payload.get("arguments")},
+                )
+            elif event == "tool_result":
+                last = trace.steps[-1] if trace.steps else None
+                if last and last.step_type == "tool_call":
+                    result = payload.get("result")
+                    if isinstance(result, dict):
+                        last.data["result_preview"] = str(result)[:200]
+                    else:
+                        last.data["result_preview"] = str(result)[:200]
+
         result = self._client.chat_with_tools(
             prompt=user_prompt,
             tools=self._tools,
             system_prompt=_INSPIRE_PROMPT,
             max_rounds=2,
             temperature=0.7,
+            progress_callback=progress_cb,
         )
 
         content = result.get("content", "")
@@ -194,10 +211,11 @@ class ShiGenerator:
         )
         return content
 
-    def _phase_refine(self, draft: str, trace) -> str:
+    def _phase_refine(self, draft: str, trace, max_rounds: int = 2) -> str:
         from openprom.tools.poetry_tools import check_meter_unified
 
-        for round_idx in range(2):
+        rounds = max(1, int(max_rounds or 2))
+        for round_idx in range(rounds):
             check = check_meter_unified(action="check", text=draft, meter_type="shi")
 
             if check.get("is_compliant"):
@@ -258,7 +276,9 @@ class ShiGenerator:
             draft = self._phase_create(
                 prompt, "generate", form, lines, chars, tone_preference, inspiration, trace
             )
-            final = self._phase_refine(draft, trace)
+            final = self._phase_refine(
+                draft, trace, max_rounds=max_rounds or self._settings.generation.shi_max_revision_rounds
+            )
 
             normalized = _normalize_result(final)
             trace.success = True
@@ -297,7 +317,9 @@ class ShiGenerator:
             draft = self._phase_create(
                 prompt, "complete", form, lines, chars, tone_preference, inspiration, trace
             )
-            final = self._phase_refine(draft, trace)
+            final = self._phase_refine(
+                draft, trace, max_rounds=max_rounds or self._settings.generation.shi_max_revision_rounds
+            )
 
             normalized = _normalize_result(final)
             trace.success = True
