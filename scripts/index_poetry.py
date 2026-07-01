@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from openprom.infrastructure.logging import setup_logging
-from openprom.services.hermes import PoetryIndexer
+from openprom.infrastructure.logging import setup_logging  # noqa: E402
+from openprom.services.hermes import PoetryIndexer  # noqa: E402
 
 logger = setup_logging("index_poetry")
 

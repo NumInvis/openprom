@@ -62,6 +62,7 @@ logs/
 
 # Testing
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 .tox/
@@ -69,6 +70,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Workspace memory
+.workbuddy/
 
 # Documentation
 docs/_build/
