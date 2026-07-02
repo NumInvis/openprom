@@ -10,7 +10,7 @@ Streaming paths still use LLMClient.stream_progress directly.
 import logging
 import time
 import uuid
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from openprom.infrastructure.config.settings import get_settings
 from openprom.services.llm_client import LLMClient, get_llm_client
@@ -27,20 +27,23 @@ _FORM_TO_CHARS = {"五绝": 5, "七绝": 7, "五律": 5, "七律": 7}
 # ---------------------------------------------------------------------------
 
 _INSPIRE_PROMPT = (
-    "你是诗歌创作助手。帮助诗人搜集灵感。\n"
-    "调用 retrieve_poetry 检索古人诗作，或 web_search 搜索知识。\n"
-    "也可以直接跳过。准备好后，用3-5句话总结创作方向和可用的意象/典故。"
+    "你是诗歌创作助手。可调用工具检索古人诗作或搜索典故。"
 )
 
 _CREATE_PROMPT = (
-    "你是当代最顶尖的诗人，深谙古典律诗绝句的精髓。\n"
-    "先有感受，再求形式；先有真意，再求工稳。\n"
-    "直接输出诗句，每句一行，不要任何解释、标题、赏析。"
+    "你是当代古典诗人。\n\n"
+    "【忌用】陈词滥调：壮志、豪情、乘风破浪、沧海、红尘、岁月、芳华、"
+    "天涯、长空、断肠、相思、离愁、寂寞、凄凉、惆怅、惘然、凭栏。\n\n"
+    "【力作要点】\n"
+    "1. 含具体物象，不以空词抒情。\n"
+    "2. 起承转合完整，末句有余韵。\n"
+    "3. 字句硬朗，每字有质地。\n\n"
+    "输出诗句，每句一行，无标题，无标点。"
 )
 
 _REFINE_PROMPT = (
-    "精准修改以下诗作的格律问题，保持原作意境和风格。\n"
-    "直接输出修改后的诗句，每句一行，不要任何解释。"
+    "修改以下诗作的格律问题，保持意境和风格。\n"
+    "直接输出诗句，每句一行，不要解释。"
 )
 
 
@@ -136,15 +139,18 @@ class ShiGenerator:
         self._tools = list(get_tool_registry().values())
         self._settings = get_settings()
 
+    @staticmethod
+    def _filter_tools(tools: List, exclude: frozenset) -> List:
+        """Return tool list minus excluded names."""
+        return [t for t in tools if t.name not in exclude]
+
     def _phase_inspire(
         self, theme: str, mode: str, form: str, lines: int, chars: int, trace
     ) -> str:
         if mode == "generate":
-            user_prompt = f"主题：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集灵感。"
+            user_prompt = f"主题：{theme}\n体裁：{form}（{lines}句×{chars}字）。"
         else:
-            user_prompt = (
-                f"已给出内容：{theme}\n体裁：{form}（{lines}句，每句{chars}字）。请搜集补全灵感。"
-            )
+            user_prompt = f"待补全内容：{theme}\n体裁：{form}（{lines}句×{chars}字）。"
 
         def progress_cb(event: str, payload: Dict[str, Any]) -> None:
             """Map chat_with_tools events to trace steps for observability."""
@@ -162,11 +168,12 @@ class ShiGenerator:
                     else:
                         last.data["result_preview"] = str(result)[:200]
 
+        inspire_tools = self._filter_tools(self._tools, frozenset({"check_meter", "self_critique"}))
         result = self._client.chat_with_tools(
             prompt=user_prompt,
-            tools=self._tools,
+            tools=inspire_tools,
             system_prompt=_INSPIRE_PROMPT,
-            max_rounds=2,
+            max_rounds=3,
             temperature=0.7,
             progress_callback=progress_cb,
         )
@@ -191,17 +198,15 @@ class ShiGenerator:
 
         if mode == "generate":
             prompt = (
-                f"主题：{theme}\n体裁：{form}（{lines}句，每句{chars}字{tone_part}）\n\n"
-                f"格律参考：\n{meter_ctx}\n\n"
-                f"灵感素材：\n{inspiration[:500]}\n\n"
-                f"请创作。直接输出诗句，每句一行。"
+                f"主题：{theme}\n体裁：{form}（{lines}句×{chars}字{tone_part}）\n"
+                f"格律：\n{meter_ctx}\n"
+                f"参考：\n{inspiration[:500]}"
             )
         else:
             prompt = (
-                f"已给出内容：{theme}\n体裁：{form}（{lines}句，每句{chars}字{tone_part}）\n\n"
-                f"格律参考：\n{meter_ctx}\n\n"
-                f"灵感素材：\n{inspiration[:500]}\n\n"
-                f"请补全。直接输出完整诗作，每句一行。"
+                f"待补全：{theme}\n体裁：{form}（{lines}句×{chars}字{tone_part}）\n"
+                f"格律：\n{meter_ctx}\n"
+                f"参考：\n{inspiration[:500]}"
             )
 
         result = self._client.chat(prompt=prompt, system_prompt=_CREATE_PROMPT, temperature=0.9)
@@ -211,7 +216,7 @@ class ShiGenerator:
         )
         return content
 
-    def _phase_refine(self, draft: str, trace, max_rounds: int = 2) -> str:
+    def _phase_refine(self, draft: str, trace, max_rounds: int = 3) -> str:
         from openprom.tools.poetry_tools import check_meter_unified
 
         rounds = max(1, int(max_rounds or 2))
@@ -237,9 +242,9 @@ class ShiGenerator:
             fix_text = "\n".join(fix_lines) if fix_lines else "\n".join(violations)
 
             refine_prompt = (
-                f"以下诗作有格律问题，请精准修改：\n\n{draft}\n\n"
-                f"问题：\n{fix_text}\n\n"
-                f"请直接输出修改后的诗句，每句一行，不要解释。"
+                f"{draft}\n\n"
+                f"格律问题：\n{fix_text}\n\n"
+                f"修改后输出诗句，每句一行："
             )
 
             result = self._client.chat(
@@ -344,13 +349,16 @@ class ShiGenerator:
         form = _resolve_form(form)
         lines = _FORM_TO_LINES.get(form, 8)
         chars = _FORM_TO_CHARS.get(form, 7)
-        prompt_text = f"主题：{prompt}\n体裁：{form}（{lines}句，每句{chars}字）。请创作。"
-        max_rounds = max_rounds or self._settings.generation.shi_max_revision_rounds
-        yield from self._client.stream_progress(
-            prompt=prompt_text,
-            tools=self._tools,
-            system_prompt=_CREATE_PROMPT,
+        return self._run_streamed(
+            prompt=prompt,
+            form=form,
+            lines=lines,
+            chars=chars,
+            tone_preference=tone_preference,
             max_rounds=max_rounds,
+            mode="generate",
+            task_name="generate_shi_stream",
+            trace_prefix="sgs",
         )
 
     def complete_stream(
@@ -363,14 +371,123 @@ class ShiGenerator:
         form = _resolve_form(form)
         lines = _FORM_TO_LINES.get(form, 8)
         chars = _FORM_TO_CHARS.get(form, 7)
-        prompt_text = f"已给出内容：{prompt}\n体裁：{form}（{lines}句，每句{chars}字）。请补全。"
-        max_rounds = max_rounds or self._settings.generation.shi_max_revision_rounds
-        yield from self._client.stream_progress(
-            prompt=prompt_text,
-            tools=self._tools,
-            system_prompt=_CREATE_PROMPT,
+        return self._run_streamed(
+            prompt=prompt,
+            form=form,
+            lines=lines,
+            chars=chars,
+            tone_preference=tone_preference,
             max_rounds=max_rounds,
+            mode="complete",
+            task_name="complete_shi_stream",
+            trace_prefix="scs",
         )
+
+    def _run_streamed(
+        self,
+        prompt: str,
+        form: str,
+        lines: int,
+        chars: int,
+        tone_preference: Optional[str],
+        max_rounds: Optional[int],
+        mode: str,
+        task_name: str,
+        trace_prefix: str,
+    ) -> Iterable[str]:
+        """Shared 3-phase streamed generation for generate/complete."""
+        from openprom.agents import TaskTrace
+        import queue
+
+        trace = TaskTrace(
+            task_name=task_name,
+            task_id=f"{trace_prefix}-{uuid.uuid4().hex[:12]}",
+            started_at=time.time(),
+        )
+        event_queue: "queue.Queue[Optional[str]]" = queue.Queue()
+
+        is_generate = mode == "generate"
+
+        def _emit(evt: str, payload: Dict[str, Any]) -> None:
+            import json
+            event_queue.put(json.dumps({"event": evt, **payload}, ensure_ascii=False))
+
+        def _run() -> None:
+            try:
+                # Phase 1: Inspire
+                _emit("phase", {"phase": "inspire", "label": "灵感搜集"})
+                inspire_tools = self._filter_tools(self._tools, frozenset({"check_meter", "self_critique"}))
+
+                def _inspire_cb(event: str, data: Dict[str, Any]) -> None:
+                    if event == "thinking":
+                        _emit("thinking", {"phase": "inspire", "round": data.get("round")})
+                    elif event == "tool_call":
+                        _emit("tool_call", {"phase": "inspire", "tool": data.get("tool"), "arguments": data.get("arguments")})
+                    elif event == "tool_result":
+                        res = data.get("result")
+                        _emit("tool_result", {"phase": "inspire", "tool": data.get("tool"), "result": res if not isinstance(res, dict) else str(res)[:300]})
+
+                user_prompt = (
+                    f"主题：{prompt}\n体裁：{form}（{lines}句×{chars}字）。"
+                    if is_generate else
+                    f"待补全内容：{prompt}\n体裁：{form}（{lines}句×{chars}字）。"
+                )
+                inspire_result = self._client.chat_with_tools(
+                    prompt=user_prompt,
+                    tools=inspire_tools,
+                    system_prompt=_INSPIRE_PROMPT,
+                    max_rounds=3,
+                    temperature=0.7,
+                    progress_callback=_inspire_cb,
+                )
+                inspiration = inspire_result.get("content", "")
+
+                # Phase 2: Create
+                _emit("phase", {"phase": "create", "label": "创作"})
+                meter_ctx = _get_meter_context(form)
+                tone_part = f"，{tone_preference}格式" if tone_preference else ""
+                topic_line = f"主题：{prompt}" if is_generate else f"待补全：{prompt}"
+                create_result = self._client.chat(
+                    prompt=(
+                        f"{topic_line}\n体裁：{form}（{lines}句×{chars}字{tone_part}）\n"
+                        f"格律：\n{meter_ctx}\n"
+                        f"参考：\n{inspiration[:500]}"
+                    ),
+                    system_prompt=_CREATE_PROMPT,
+                    temperature=0.9,
+                )
+                _emit("done", {"content": create_result.get("content", "")})
+
+                # Phase 3: Refine
+                _emit("phase", {"phase": "refine", "label": "格律修正"})
+                draft = create_result.get("content", "")
+                refined = self._phase_refine(draft, trace, max_rounds=max_rounds or self._settings.generation.shi_max_revision_rounds)
+
+                normalized = _normalize_result(refined)
+                trace.success = True
+                trace.finished_at = time.time()
+                _persist_trace(trace)
+                _emit("final", {"content": normalized})
+            except Exception as e:
+                logger.exception("%s failed", task_name)
+                _emit("error", {"message": str(e)})
+            finally:
+                event_queue.put(None)
+
+        import threading
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+
+        while True:
+            try:
+                line = event_queue.get(timeout=5.0)
+            except queue.Empty:
+                continue
+            if line is None:
+                break
+            yield line
+
+        thread.join(timeout=5.0)
 
 
 def generate_shi(

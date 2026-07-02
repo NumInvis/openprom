@@ -1,5 +1,5 @@
 /**
- * OpenPROM · 墨印 Concrete Ink · 前端逻辑
+ * OpenPROM · 前端逻辑
  * 模块：State / DOM / Session / API / UI / Tabs / Animate / History / Theme / Actions
  * SSE 全事件：thinking / tool_call / tool_result / done / final / error / start / result
  */
@@ -465,12 +465,17 @@ const Actions = {
     const endpoint = `/api/v1/${type}/${mode}`;
     try {
       for await (const ev of API.stream(endpoint, body)) {
-        if (ev.event === 'thinking') {
-          this.appendLog(logBody, 'thinking', `思考 · 第 ${ev.round || '?'} 轮`);
+        if (ev.event === 'phase') {
+          const label = ev.label || ev.phase;
+          this.appendLog(logBody, 'phase', `━━ ${label} ━━`);
+        } else if (ev.event === 'thinking') {
+          const phase = ev.phase ? `[${ev.phase}] ` : '';
+          this.appendLog(logBody, 'thinking', `${phase}思考 · 第 ${ev.round || '?'} 轮`);
         } else if (ev.event === 'tool_call') {
-          this.appendLog(logBody, 'tool', `调用工具 ${ev.tool}(${JSON.stringify(ev.arguments || {})})`);
+          this.appendLog(logBody, 'tool', `→ ${ev.tool}(${JSON.stringify(ev.arguments || {})})`);
         } else if (ev.event === 'tool_result') {
-          this.appendLog(logBody, 'tool', `工具 ${ev.tool} 返回：${JSON.stringify(ev.result || {}).slice(0, 300)}`);
+          const r = typeof ev.result === 'string' ? ev.result : JSON.stringify(ev.result || {});
+          this.appendLog(logBody, 'tool', `← ${ev.tool}: ${r.slice(0, 200)}`);
         } else if (ev.event === 'done') {
           if (ev.content) content.textContent = ev.content;
         } else if (ev.event === 'final') {
@@ -478,7 +483,6 @@ const Actions = {
           status.textContent = '完成';
           status.className = 'gen-output-status done';
         } else if (ev.event === 'start') {
-          // 评鉴流式起点（生成场景不会触发）
         } else if (ev.event === 'result') {
           content.textContent = ev.content || JSON.stringify(ev, null, 2);
           status.textContent = '完成';
@@ -701,7 +705,7 @@ const Actions = {
   share() {
     const r = State.result;
     if (!r) return;
-    const text = `【墨印评鉴】\n上联：${r.upper}\n下联：${r.lower}\n总分：${r.total_score}分（${r.grade}）\n\n来自 OpenPROM 墨印诗词 AI`;
+    const text = `【OpenPROM 评鉴】\n上联：${r.upper}\n下联：${r.lower}\n总分：${r.total_score}分（${r.grade}）\n\n来自 OpenPROM`;
     if (navigator.share) navigator.share({ title: '对联评鉴', text }).catch(() => {});
     else navigator.clipboard.writeText(text).then(() => UI.toast('已复制到剪贴板', 'success'));
   },

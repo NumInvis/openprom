@@ -175,7 +175,7 @@ class CoupletGenerator:
             prompt=user_prompt,
             tools=self._tools,
             system_prompt=_INSPIRE_PROMPT,
-            max_rounds=2,
+            max_rounds=3,
             temperature=0.7,
             progress_callback=progress_cb,
         )
@@ -237,7 +237,7 @@ class CoupletGenerator:
 
     # -- Phase 3: Refine -------------------------------------------------
 
-    def _phase_refine(self, draft: str, meter_type: str, trace, max_rounds: int = 2) -> str:
+    def _phase_refine(self, draft: str, meter_type: str, trace, max_rounds: int = 3) -> str:
         """Verify meter and apply targeted fixes.
 
         ``max_rounds`` caps the number of check→fix iterations. Defaults to 2

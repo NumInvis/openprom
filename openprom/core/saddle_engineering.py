@@ -89,7 +89,7 @@ class InputController:
 
     # 输入长度限制
     MIN_LENGTH = 2
-    MAX_LENGTH = 100
+    MAX_LENGTH = 200
 
     # 允许的字符集
     ALLOWED_CHARS = re.compile(r"^[\u4e00-\u9fff\uff00-\uffef\u3000-\u303f]+$")

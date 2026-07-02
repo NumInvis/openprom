@@ -23,7 +23,7 @@ class TaskConfig:
     description: str = ""
     system_prompt: str = ""
     tools: List[str] = field(default_factory=list)
-    max_llm_rounds: int = 3
+    max_llm_rounds: int = 4
     use_rag: bool = True
     rag_task_type: str = "general"
     use_saddle: bool = False

@@ -53,7 +53,7 @@ class ToolsConfig:
     meter_match_rate_threshold: float = 0.85
     meter_strict_match_rate_threshold: float = 0.95
     rhyme_book: str = "平水韵"
-    rhyme_max_suggestions: int = 8
+    rhyme_max_suggestions: int = 24
     rhyme_common_chars_weight: float = 1.2
 
 
@@ -61,9 +61,9 @@ class ToolsConfig:
 class GenerationConfig:
     """生成/补全配置"""
 
-    couplet_max_revision_rounds: int = 3
+    couplet_max_revision_rounds: int = 4
     couplet_default_length: int = 7
-    shi_max_revision_rounds: int = 4
+    shi_max_revision_rounds: int = 5
     shi_default_form: str = "七律"
     shi_supported_forms: List[str] = field(default_factory=lambda: ["五绝", "七绝", "五律", "七律"])
     streaming_enabled: bool = True

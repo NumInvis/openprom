@@ -48,16 +48,16 @@ tools:
     strict_match_rate_threshold: 0.95
   rhyme:
     book: 平水韵
-    max_suggestions: 8
+    max_suggestions: 24
     # 常用韵字优先级（出现频率高）
     common_chars_weight: 1.2
 
 generation:
   couplet:
-    max_revision_rounds: 3
+    max_revision_rounds: 4
     default_length: 7
   shi:
-    max_revision_rounds: 4
+    max_revision_rounds: 5
     default_form: 七律
     supported_forms: [五绝, 七绝, 五律, 七律]
   streaming:

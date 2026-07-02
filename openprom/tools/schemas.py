@@ -73,9 +73,9 @@ GET_RHYME_CANDIDATES_SCHEMA = {
         },
         "count": {
             "type": "integer",
-            "description": "返回候选字数量（默认 8）。",
+            "description": "返回候选字数量（默认 24）。",
             "minimum": 1,
-            "maximum": 20,
+            "maximum": 60,
         },
     },
     "required": ["char", "tone"],

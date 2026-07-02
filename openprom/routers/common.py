@@ -61,8 +61,8 @@ class AnalysisDetail(BaseModel):
 class CoupletRequest(BaseModel):
     """Couplet scoring request."""
 
-    upper: str = Field(..., description="上联", min_length=1, max_length=100)
-    lower: str = Field(..., description="下联", min_length=1, max_length=100)
+    upper: str = Field(..., description="上联", min_length=1, max_length=200)
+    lower: str = Field(..., description="下联", min_length=1, max_length=200)
     enable_cache: bool = Field(default=True, description="是否启用缓存")
     stream: bool = Field(default=False, description="是否启用流式输出")
 
@@ -98,7 +98,7 @@ class MeterRequest(BaseModel):
         ...,
         description="诗词文本；律诗按行用\\n分隔，对联用\\n分隔上下联",
         min_length=1,
-        max_length=500,
+        max_length=1000,
     )
     meter_type: str = Field(default="shi", description="类型：shi、ci、couplet")
     pattern_name: Optional[str] = Field(default=None, description="指定诗体/词牌名称")
@@ -121,7 +121,7 @@ class MeterResponse(BaseModel):
 class GenerateRequest(BaseModel):
     """Generation/Completion request."""
 
-    prompt: str = Field(..., description="主题、上联或已给出的诗句", min_length=1, max_length=500)
+    prompt: str = Field(..., description="主题、上联或已给出的诗句", min_length=1, max_length=4000)
     length: Optional[int] = Field(default=None, description="对联每联字数（5/7）")
     form: Optional[str] = Field(default=None, description="诗体（五绝/七绝/五律/七律）")
     tone_preference: Optional[str] = Field(default=None, description="平起/仄起（可选）")
@@ -160,7 +160,7 @@ def get_llm_client_instance(request: Request):
 class KnowledgeSearchRequest(BaseModel):
     """Knowledge layer retrieval request."""
 
-    query: str = Field(..., description="检索查询", min_length=1, max_length=500)
+    query: str = Field(..., description="检索查询", min_length=1, max_length=1000)
     top_k: int = Field(default=5, description="返回结果数", ge=1, le=50)
     task_type: Optional[str] = Field(
         default=None,
@@ -245,7 +245,7 @@ class TaskRunRequest(BaseModel):
     """Run an arbitrary registered task via AgentRunner."""
 
     task_name: str = Field(..., description="任务名（必须已在 TaskRegistry 中注册）")
-    user_prompt: str = Field(..., description="用户输入", min_length=1, max_length=2000)
+    user_prompt: str = Field(..., description="用户输入", min_length=1, max_length=4000)
     system_prompt: Optional[str] = Field(default=None, description="覆盖任务默认 system prompt")
     max_rounds: Optional[int] = Field(
         default=None, description="覆盖任务的最大 LLM 轮数", ge=1, le=10

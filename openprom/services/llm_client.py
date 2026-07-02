@@ -155,7 +155,7 @@ class LLMClient:
         prompt: str,
         tools: List[Tool],
         system_prompt: Optional[str] = None,
-        max_rounds: int = 5,
+        max_rounds: int = 6,
         temperature: Optional[float] = None,
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
@@ -177,11 +177,14 @@ class LLMClient:
             if progress_callback:
                 progress_callback("thinking", {"round": round_idx + 1, "max_rounds": max_rounds})
 
+            # On the last round, suppress tools so the LLM must give a text answer.
+            use_schemas = tool_schemas if round_idx < max_rounds - 1 else None
+
             response = self._call(
                 messages=messages,
                 temperature=temp,
                 timeout=self._settings.api.model_timeout,
-                tools=tool_schemas,
+                tools=use_schemas,
             )
             message = response.choices[0].message
             assistant_msg = {
@@ -244,7 +247,7 @@ class LLMClient:
         prompt: str,
         tools: List[Tool],
         system_prompt: Optional[str] = None,
-        max_rounds: int = 5,
+        max_rounds: int = 6,
         temperature: Optional[float] = None,
     ) -> Iterable[str]:
         """Yield SSE-style data lines for a tool-calling generation process.
